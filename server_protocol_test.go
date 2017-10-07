@@ -80,7 +80,7 @@ func TestServerProtocol_Conversation(t *testing.T) {
 
 	// resp
 	require.Empty(t, tr.output)
-	tunnel, err := proto.AcceptConnection(NewIPV4SocksAddr(net.IP{2, 3, 4, 5}), uint16(0x2345))
+	tunnel, err := proto.AcceptConnection(NewSocksAddrFromIPV4(net.IP{2, 3, 4, 5}), uint16(0x2345))
 	require.NoError(t, err)
 	assert.Equal(t, []byte{0x05, 0x00, 0x00, 0x01, 2, 3, 4, 5, 0x23, 0x45}, tr.output)
 	tr.output = []byte{}
@@ -143,15 +143,15 @@ func TestServerProtocol_RejectRequest(t *testing.T) {
 func TestSocksAddr_ToBytes(t *testing.T) {
 	assert.Equal(t,
 		[]byte{0x03, 4, 'a', 's', 'd', 'f'},
-		NewDomainSocksAddr("asdf").ToBytes())
+		NewSocksAddrFromDomain("asdf").ToBytes())
 	assert.Equal(t,
 		[]byte{0x04, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-		NewIPV6SocksAddr(net.IPv6loopback).ToBytes())
+		NewSocksAddrFromIPV6(net.IPv6loopback).ToBytes())
 }
 
 func TestReadSocksAddr(t *testing.T) {
 	buf := []byte{0x03, 4, 'a', 's', 'd', 'f'}
 	sa, err := readSocksAddr(buf[0], bytes.NewReader(buf[1:]))
 	require.NoError(t, err)
-	assert.Equal(t, NewDomainSocksAddr("asdf"), sa)
+	assert.Equal(t, NewSocksAddrFromDomain("asdf"), sa)
 }

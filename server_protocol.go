@@ -18,15 +18,15 @@ func NewSocksAddr() SocksAddr {
 	return SocksAddr{ATypeIPV4, net.IP{0, 0, 0, 0}, ""}
 }
 
-func NewIPV4SocksAddr(ip net.IP) SocksAddr {
+func NewSocksAddrFromIPV4(ip net.IP) SocksAddr {
 	return SocksAddr{ATypeIPV4, ip, ""}
 }
 
-func NewIPV6SocksAddr(ip net.IP) SocksAddr {
+func NewSocksAddrFromIPV6(ip net.IP) SocksAddr {
 	return SocksAddr{ATypeIPV6, ip, ""}
 }
 
-func NewDomainSocksAddr(domain string) SocksAddr {
+func NewSocksAddrFromDomain(domain string) SocksAddr {
 	return SocksAddr{ATypeDomain, nil, domain}
 }
 
@@ -47,6 +47,17 @@ func (sa SocksAddr) ToBytes() (data []byte) {
 		panic("bad atype")
 	}
 	return
+}
+
+func (sa SocksAddr) String() string {
+	switch sa.Type {
+	case ATypeIPV4, ATypeIPV6:
+		return sa.IP.String()
+	case ATypeDomain:
+		return sa.Domain
+	default:
+		panic("bad atype")
+	}
 }
 
 const (
@@ -101,19 +112,8 @@ func (proto *ServerProtocol) checkState(expect int) {
 }
 
 func readRequired(reader io.Reader, n int) (data []byte, err error) {
-	if n <= 0 {
-		panic("non-positive n")
-	}
-
-	var num int
-	for remain := n; remain > 0; remain -= num {
-		buf := make([]byte, remain)
-		num, err = reader.Read(buf)
-		if err != nil {
-			return
-		}
-		data = append(data, buf...)
-	}
+	data = make([]byte, n)
+	_, err = io.ReadFull(reader, data)
 	return
 }
 
