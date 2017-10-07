@@ -18,6 +18,7 @@ func (s *Server) Run() (err error) {
 	if err != nil {
 		return
 	}
+	log.Infof("server started on %v", listener.Addr())
 
 	for {
 		conn, err := listener.Accept()

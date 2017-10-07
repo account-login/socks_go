@@ -1,7 +1,7 @@
 package main
 
 import (
-	"socks_go"
+	"github.com/account-login/socks_go"
 	"fmt"
 	"os"
 )
