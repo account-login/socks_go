@@ -1,16 +1,25 @@
 package main
 
 import (
-	"github.com/account-login/socks_go"
-	"fmt"
 	"os"
+
+	"github.com/account-login/socks_go"
+	log "github.com/cihub/seelog"
 )
 
-func main() {
+func realMain() int {
+	defer log.Flush()
+
 	server := socks_go.Server{Addr: ":1080"}
 	err := server.Run()
 	if err != nil {
-		fmt.Print(err)
-		os.Exit(1)
+		log.Errorf("failed to start server: %v", err)
+		return 1
+	} else {
+		return 0
 	}
+}
+
+func main() {
+	os.Exit(realMain())
 }
