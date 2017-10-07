@@ -46,7 +46,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 			log.Errorf("client: %v, close err: %v", conn.RemoteAddr(), err)
 		}
 
-		log.Infof("client: %v gone", conn.RemoteAddr())
+		log.Infof("client: %v, gone", conn.RemoteAddr())
 	}()
 
 	proto := NewServerProtocol(conn)
@@ -150,6 +150,7 @@ func (s *Server) cmdConnect(conn net.Conn, proto *ServerProtocol, addr SocksAddr
 		merr.Add("ReadClient", rerr)
 		merr.Add("WriteClient", <-cr)
 	case rerr := <-cw:
+		log.Debugf("target gone: %v", targetConn.RemoteAddr())
 		merr.Add("ReadTarget", rerr)
 		merr.Add("WriteClient", <-cw)
 	}
