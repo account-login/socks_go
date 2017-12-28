@@ -9,10 +9,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-type AuthHandlerFunc func(methods []byte, protocol ServerProtocol) error
+type AuthHandlerFunc func(methods []byte, proto *ServerProtocol) error
 
 type Server struct {
-	Addr string
+	Addr        string
 	AuthHandler AuthHandlerFunc
 }
 
@@ -23,8 +23,12 @@ func NewServer(addr string, authHandler AuthHandlerFunc) Server {
 	return Server{addr, authHandler}
 }
 
-func noAuthHandler(methods []byte, protocol ServerProtocol) error {
-	return protocol.AcceptAuthMethod(MethodNone)
+func noAuthHandler(methods []byte, proto *ServerProtocol) error {
+	err := proto.AcceptAuthMethod(MethodNone)
+	if err == nil {
+		err = proto.AuthDone()
+	}
+	return err
 }
 
 func (s *Server) Run() (err error) {
@@ -72,7 +76,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		return
 	}
 
-	err = s.AuthHandler(methods, proto)
+	err = s.AuthHandler(methods, &proto)
 	if err != nil {
 		return
 	}
