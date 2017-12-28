@@ -69,10 +69,6 @@ func (c *Client) Connect(addr string) (tunnel ClientTunnel, err error) {
 	if err != nil {
 		return
 	}
-	err = c.protocol.AuthDone()
-	if err != nil {
-		return
-	}
 
 	// connect
 	var tcpAddr *net.TCPAddr
