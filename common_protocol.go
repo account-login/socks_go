@@ -30,6 +30,14 @@ func NewSocksAddrFromDomain(domain string) SocksAddr {
 	return SocksAddr{ATypeDomain, nil, domain}
 }
 
+func NewSocksAddrFromIP(ip net.IP) SocksAddr {
+	if ip4 := ip.To4(); ip4 != nil {
+		return NewSocksAddrFromIPV4(ip)
+	} else {
+		return NewSocksAddrFromIPV6(ip.To16())
+	}
+}
+
 func (sa SocksAddr) ToBytes() (data []byte) {
 	data = append(data, sa.Type)
 	switch sa.Type {
