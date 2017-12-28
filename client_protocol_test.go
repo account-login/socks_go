@@ -49,3 +49,5 @@ func TestClientProtocol_Conversation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []byte{1, 2, 3}, buf)
 }
+
+// TODO: test excaptional case
