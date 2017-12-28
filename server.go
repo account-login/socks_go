@@ -16,11 +16,11 @@ type Server struct {
 	AuthHandler AuthHandlerFunc
 }
 
-func NewServer(Addr string, AuthHandler AuthHandlerFunc) Server {
-	if AuthHandler == nil {
-		AuthHandler = noAuthHandler
+func NewServer(addr string, authHandler AuthHandlerFunc) Server {
+	if authHandler == nil {
+		authHandler = noAuthHandler
 	}
-	return Server{Addr, AuthHandler}
+	return Server{addr, authHandler}
 }
 
 func noAuthHandler(methods []byte, protocol ServerProtocol) error {
