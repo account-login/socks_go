@@ -10,7 +10,7 @@ import (
 func realMain() int {
 	defer log.Flush()
 
-	server := socks_go.Server{Addr: ":1080"}
+	server := socks_go.NewServer(":1080", nil)
 	err := server.Run()
 	if err != nil {
 		log.Errorf("failed to start server: %v", err)

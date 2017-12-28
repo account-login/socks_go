@@ -97,7 +97,7 @@ const (
 )
 
 type ServerProtocol struct {
-	transport io.ReadWriter
+	Transport io.ReadWriter
 	State     int
 }
 
@@ -129,7 +129,7 @@ func (proto *ServerProtocol) GetAuthMethods() (methods []byte, err error) {
 	}()
 
 	var buf []byte
-	buf, err = readRequired(proto.transport, 2)
+	buf, err = readRequired(proto.Transport, 2)
 	if err != nil {
 		err = errors.Wrap(err, "can not read version and methods num")
 		return
@@ -144,7 +144,7 @@ func (proto *ServerProtocol) GetAuthMethods() (methods []byte, err error) {
 
 	// methods
 	numMethods := buf[1]
-	methods, err = readRequired(proto.transport, int(numMethods))
+	methods, err = readRequired(proto.Transport, int(numMethods))
 	if err != nil {
 		err = errors.Wrapf(err, "can not read methods. num: %d", numMethods)
 		return
@@ -167,7 +167,7 @@ func (proto *ServerProtocol) AcceptAuthMethod(method byte) (err error) {
 		}
 	}()
 
-	_, err = proto.transport.Write([]byte{0x05, method})
+	_, err = proto.Transport.Write([]byte{0x05, method})
 	return
 }
 
@@ -185,7 +185,7 @@ func (proto *ServerProtocol) GetRequest() (cmd byte, addr SocksAddr, port uint16
 		}
 	}()
 
-	return readReq(proto.transport)
+	return readReq(proto.Transport)
 }
 
 func (proto *ServerProtocol) AcceptConnection(bindAddr SocksAddr, bindPort uint16) (trans io.ReadWriter, err error) {
@@ -198,11 +198,11 @@ func (proto *ServerProtocol) AcceptConnection(bindAddr SocksAddr, bindPort uint1
 		}
 	}()
 
-	err = writeResp(proto.transport, ReplyOK, bindAddr, bindPort)
+	err = writeResp(proto.Transport, ReplyOK, bindAddr, bindPort)
 	if err != nil {
 		return
 	}
-	trans = proto.transport
+	trans = proto.Transport
 	return
 }
 
@@ -216,7 +216,7 @@ func (proto *ServerProtocol) RejectRequest(reply byte) (err error) {
 		}
 	}()
 
-	return writeResp(proto.transport, reply, NewSocksAddr(), 0)
+	return writeResp(proto.Transport, reply, NewSocksAddr(), 0)
 }
 
 func writeResp(writer io.Writer, reply byte, addr SocksAddr, port uint16) (err error) {
