@@ -30,7 +30,6 @@ func NewClient(transport io.ReadWriter, authHandlers map[byte]ClientAuthHandlerF
 }
 
 func clientNoAuthHandler(proto *ClientProtocol) error {
-	proto.AuthDone()
 	return nil
 }
 
@@ -66,6 +65,11 @@ func (c *Client) Connect(addr string) (tunnel ClientTunnel, err error) {
 	}
 
 	err = handler(&c.protocol)
+	if err != nil {
+		return
+	}
+
+	err = c.protocol.AuthDone()
 	if err != nil {
 		return
 	}
