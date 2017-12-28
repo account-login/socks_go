@@ -69,10 +69,11 @@ func (sa SocksAddr) String() string {
 }
 
 const (
-	MethodNone     byte = 0
-	MethodGSSApi   byte = 1
-	MethodUserName byte = 2
-	MethodReject   byte = 0xff
+	MethodNone         byte = 0
+	MethodGSSApi       byte = 1
+	MethodUserName     byte = 2
+	MethodPrivateBegin byte = 0x80
+	MethodReject       byte = 0xff
 )
 
 const (

@@ -73,7 +73,7 @@ func realMain() int {
 			}
 			role := "reader"
 			if !reader {
-				role = "write"
+				role = "writer"
 			}
 			log.Errorf("%s %s %s: %v", dir, role, err)
 		}
