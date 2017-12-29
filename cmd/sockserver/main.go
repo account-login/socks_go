@@ -3,9 +3,10 @@ package main
 import (
 	"os"
 
+	"net"
+
 	"github.com/account-login/socks_go"
 	log "github.com/cihub/seelog"
-	"net"
 )
 
 const MethodMyExtended = socks_go.MethodPrivateBegin + 1

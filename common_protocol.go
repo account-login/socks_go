@@ -38,6 +38,14 @@ func NewSocksAddrFromIP(ip net.IP) SocksAddr {
 	}
 }
 
+func NewSocksAddrFromString(addr string) SocksAddr {
+	if ip := net.ParseIP(addr); ip != nil {
+		return NewSocksAddrFromIP(ip)
+	} else {
+		return NewSocksAddrFromDomain(addr)
+	}
+}
+
 func (sa SocksAddr) ToBytes() (data []byte) {
 	data = append(data, sa.Type)
 	switch sa.Type {

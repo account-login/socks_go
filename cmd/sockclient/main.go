@@ -7,6 +7,8 @@ import (
 	"io"
 	"net"
 
+	"strconv"
+
 	"github.com/account-login/socks_go"
 	log "github.com/cihub/seelog"
 )
@@ -55,6 +57,7 @@ func extendedAuthHandler(proto *socks_go.ClientProtocol) (err error) {
 func realMain() int {
 	defer log.Flush()
 
+	// parse args
 	proxyArg := flag.String("proxy", "127.0.0.1:1080", "socks5 proxy server")
 	flag.Parse()
 	target := flag.Arg(0)
@@ -63,12 +66,26 @@ func realMain() int {
 		return 1
 	}
 
+	host, portStr, err := net.SplitHostPort(target)
+	if err != nil {
+		log.Errorf("can not parse host:port: %s", target)
+		return 4
+	}
+	portInt, err := strconv.ParseUint(portStr, 10, 16)
+	if err != nil {
+		log.Errorf("can not parse host:port: %s", target)
+		return 4
+	}
+	port := uint16(portInt)
+
+	// connect to proxy server
 	conn, err := net.Dial("tcp", *proxyArg)
 	if err != nil {
 		log.Errorf("Dial to proxy failed: %v", err)
 		return 2
 	}
 
+	// make socks5 client
 	client := socks_go.NewClient(
 		conn,
 		map[byte]socks_go.ClientAuthHandlerFunc{
@@ -76,12 +93,15 @@ func realMain() int {
 			MethodMyExtended:    extendedAuthHandler,
 		},
 	)
-	tunnel, err := client.Connect(target)
+
+	// issue command to server
+	tunnel, err := client.Connect(host, port)
 	if err != nil {
 		log.Errorf("client.Connect(%v) failed: %v", target, err)
 		return 3
 	}
 
+	// tunnel stdin and stdout through proxy
 	l2r := make(chan error)
 	r2l := make(chan error)
 	go bridgeReaderWriter(os.Stdin, tunnel, l2r)

@@ -2,7 +2,6 @@ package socks_go
 
 import (
 	"io"
-	"net"
 
 	"github.com/pkg/errors"
 )
@@ -33,7 +32,7 @@ func ClientNoAuthHandler(proto *ClientProtocol) error {
 	return nil
 }
 
-func (c *Client) Connect(addr string) (tunnel ClientTunnel, err error) {
+func (c *Client) ConnectSockAddr(sockAddr SocksAddr, port uint16) (tunnel ClientTunnel, err error) {
 	// send auth methods
 	methods := make([]byte, 0, len(c.authHandlers))
 	var method byte
@@ -74,14 +73,14 @@ func (c *Client) Connect(addr string) (tunnel ClientTunnel, err error) {
 		return
 	}
 
-	// connect
-	var tcpAddr *net.TCPAddr
-	tcpAddr, err = net.ResolveTCPAddr("tcp", addr)
-	if err != nil {
-		return
-	}
+	//// connect
+	//var tcpAddr *net.TCPAddr
+	//tcpAddr, err = net.ResolveTCPAddr("tcp", addr)	// TODO: allow passing domain name to server
+	//if err != nil {
+	//	return
+	//}
 
-	err = c.protocol.SendCommand(CmdConnect, NewSocksAddrFromIP(tcpAddr.IP), uint16(tcpAddr.Port))
+	err = c.protocol.SendCommand(CmdConnect, sockAddr, port)
 	if err != nil {
 		return
 	}
@@ -105,4 +104,8 @@ func (c *Client) Connect(addr string) (tunnel ClientTunnel, err error) {
 		BindPort:   bindPort,
 	}
 	return
+}
+
+func (c *Client) Connect(host string, port uint16) (tunnel ClientTunnel, err error) {
+	return c.ConnectSockAddr(NewSocksAddrFromString(host), port)
 }
