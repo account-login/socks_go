@@ -71,7 +71,10 @@ func realMain() int {
 
 	client := socks_go.NewClient(
 		conn,
-		map[byte]socks_go.ClientAuthHandlerFunc{MethodMyExtended: extendedAuthHandler},
+		map[byte]socks_go.ClientAuthHandlerFunc{
+			socks_go.MethodNone: socks_go.ClientNoAuthHandler,
+			MethodMyExtended:    extendedAuthHandler,
+		},
 	)
 	tunnel, err := client.Connect(target)
 	if err != nil {

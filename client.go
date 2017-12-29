@@ -23,13 +23,13 @@ type ClientTunnel struct {
 func NewClient(transport io.ReadWriter, authHandlers map[byte]ClientAuthHandlerFunc) Client {
 	if len(authHandlers) == 0 {
 		authHandlers = map[byte]ClientAuthHandlerFunc{
-			MethodNone: clientNoAuthHandler,
+			MethodNone: ClientNoAuthHandler,
 		}
 	}
 	return Client{NewClientProtocol(transport), authHandlers}
 }
 
-func clientNoAuthHandler(proto *ClientProtocol) error {
+func ClientNoAuthHandler(proto *ClientProtocol) error {
 	return nil
 }
 
