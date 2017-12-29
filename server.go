@@ -152,7 +152,7 @@ func (s *Server) cmdConnect(conn net.Conn, proto *ServerProtocol, addr SocksAddr
 	var bindPort uint16
 	bindAddr, bindPort, err = parseNetAddr(targetConn.LocalAddr())
 	if err != nil {
-		err = errors.Wrapf(err, "can not parse LocalAddr: $v", targetConn.LocalAddr())
+		err = errors.Wrapf(err, "can not parse LocalAddr: %v", targetConn.LocalAddr())
 		return
 	}
 
