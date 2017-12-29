@@ -73,13 +73,6 @@ func (c *Client) ConnectSockAddr(sockAddr SocksAddr, port uint16) (tunnel Client
 		return
 	}
 
-	//// connect
-	//var tcpAddr *net.TCPAddr
-	//tcpAddr, err = net.ResolveTCPAddr("tcp", addr)	// TODO: allow passing domain name to server
-	//if err != nil {
-	//	return
-	//}
-
 	err = c.protocol.SendCommand(CmdConnect, sockAddr, port)
 	if err != nil {
 		return
@@ -107,5 +100,6 @@ func (c *Client) ConnectSockAddr(sockAddr SocksAddr, port uint16) (tunnel Client
 }
 
 func (c *Client) Connect(host string, port uint16) (tunnel ClientTunnel, err error) {
+	// TODO: allow resolve host on local machine
 	return c.ConnectSockAddr(NewSocksAddrFromString(host), port)
 }
