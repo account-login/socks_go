@@ -24,8 +24,7 @@ func NewServer(addr string, authHandler AuthHandlerFunc) Server {
 }
 
 func noAuthHandler(methods []byte, proto *ServerProtocol) error {
-	err := proto.AcceptAuthMethod(MethodNone)
-	return err
+	return proto.AcceptAuthMethod(MethodNone)
 }
 
 func (s *Server) Run() (err error) {

@@ -5,7 +5,43 @@ import (
 
 	"github.com/account-login/socks_go"
 	log "github.com/cihub/seelog"
+	"net"
 )
+
+const MethodMyExtended = socks_go.MethodPrivateBegin + 1
+
+func extenedAuthHandler(methods []byte, proto *socks_go.ServerProtocol) error {
+	extended := false
+	for _, method := range methods {
+		if method == MethodMyExtended {
+			extended = true
+			break
+		}
+	}
+
+	if extended {
+		err := proto.AcceptAuthMethod(MethodMyExtended)
+		if err != nil {
+			return err
+		}
+
+		// big endian
+		ip := net.IPv4(0, 0, 0, 0)
+		if conn, ok := proto.Transport.(net.Conn); ok {
+			if tcpAddr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+				if ip4 := tcpAddr.IP.To4(); ip4 != nil {
+					ip = ip4
+				}
+			}
+		}
+
+		log.Infof("remote ip: %v", ip)
+		_, err = proto.Transport.Write(ip[:4])
+		return err
+	} else {
+		return proto.AcceptAuthMethod(socks_go.MethodNone)
+	}
+}
 
 func realMain() int {
 	defer log.Flush()
@@ -15,7 +51,7 @@ func realMain() int {
 		addr = os.Args[1]
 	}
 
-	server := socks_go.NewServer(addr, nil)
+	server := socks_go.NewServer(addr, extenedAuthHandler)
 	err := server.Run()
 	if err != nil {
 		log.Errorf("failed to start server: %v", err)

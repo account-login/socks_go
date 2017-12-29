@@ -11,6 +11,8 @@ import (
 	log "github.com/cihub/seelog"
 )
 
+const MethodMyExtended = socks_go.MethodPrivateBegin + 1
+
 // copied from server.go
 func bridgeReaderWriter(reader io.Reader, writer io.Writer, errchan chan<- error) {
 	buf := make([]byte, 4096)
@@ -34,6 +36,22 @@ func bridgeReaderWriter(reader io.Reader, writer io.Writer, errchan chan<- error
 	}
 }
 
+// copied from common_protocol.go
+func readRequired(reader io.Reader, n int) (data []byte, err error) {
+	data = make([]byte, n)
+	_, err = io.ReadFull(reader, data)
+	return
+}
+
+func extendedAuthHandler(proto *socks_go.ClientProtocol) (err error) {
+	var ip net.IP
+	ip, err = readRequired(proto.Transport, 4)
+	if err == nil {
+		log.Infof("ip echo: %v", ip)
+	}
+	return err
+}
+
 func realMain() int {
 	defer log.Flush()
 
@@ -51,7 +69,10 @@ func realMain() int {
 		return 2
 	}
 
-	client := socks_go.NewClient(conn, nil)
+	client := socks_go.NewClient(
+		conn,
+		map[byte]socks_go.ClientAuthHandlerFunc{MethodMyExtended: extendedAuthHandler},
+	)
 	tunnel, err := client.Connect(target)
 	if err != nil {
 		log.Errorf("client.Connect(%v) failed: %v", target, err)
