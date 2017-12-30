@@ -5,6 +5,9 @@ import (
 
 	"net"
 
+	"runtime"
+	"time"
+
 	"github.com/account-login/socks_go"
 	log "github.com/cihub/seelog"
 )
@@ -44,6 +47,18 @@ func extenedAuthHandler(methods []byte, proto *socks_go.ServerProtocol) error {
 	}
 }
 
+func monitor() {
+	prev := 0
+	for {
+		now := runtime.NumGoroutine()
+		if now != prev {
+			log.Debugf("goroutines: %d", now)
+		}
+		prev = now
+		time.Sleep(1 * time.Second)
+	}
+}
+
 func realMain() int {
 	defer log.Flush()
 
@@ -51,6 +66,8 @@ func realMain() int {
 	if len(os.Args) > 1 {
 		addr = os.Args[1]
 	}
+
+	go monitor()
 
 	server := socks_go.NewServer(addr, extenedAuthHandler)
 	err := server.Run()
