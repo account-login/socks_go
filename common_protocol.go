@@ -151,9 +151,14 @@ func readRequestOrReply(reader io.Reader) (cmdOrRep byte, addr SocksAddr, port u
 	var buf []byte
 	// ver
 	buf, err = readRequired(reader, 4)
+	if err != nil {
+		err = errors.Wrap(err, "readRequestOrReply: can not read header")
+		return
+	}
+
 	ver := buf[0]
 	if ver != 0x05 {
-		err = errors.Errorf("bad version: %#x", ver)
+		err = errors.Errorf("readRequestOrReply: bad version: %#x, bytes: %v", ver, buf)
 		return
 	}
 

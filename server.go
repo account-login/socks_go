@@ -97,7 +97,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		err = s.cmdConnect(conn, &proto, addr, port)
 	default:
 		err = errors.Errorf("unsupported cmd: %#x", cmd)
-		proto.RejectRequest(ReplyCmdNotSupported)	// ignore err
+		proto.RejectRequest(ReplyCmdNotSupported) // ignore err
 	}
 	return
 }

@@ -68,10 +68,14 @@ func (proto *ClientProtocol) ReceiveAuthMethod() (method byte, err error) {
 
 	var buf []byte
 	buf, err = readRequired(proto.Transport, 2)
+	if err != nil {
+		err = errors.Wrap(err, "ReceiveAuthMethod: can not read data")
+		return
+	}
 
 	ver := buf[0]
 	if ver != 0x05 {
-		err = errors.Errorf("bad version: %#x", ver)
+		err = errors.Errorf("ReceiveAuthMethod: bad version: %#x", ver)
 		return
 	}
 
