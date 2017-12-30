@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/account-login/socks_go"
+	"github.com/account-login/socks_go/cmd"
 	log "github.com/cihub/seelog"
 )
 
@@ -56,6 +57,7 @@ func extendedAuthHandler(proto *socks_go.ClientProtocol) (err error) {
 
 func realMain() int {
 	defer log.Flush()
+	cmd.ConfigLogging()
 
 	fifoDefers := make([]func(), 0)
 	defer func() {
