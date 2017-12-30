@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/account-login/socks_go/util"
 	"github.com/pkg/errors"
 )
 
@@ -102,27 +103,21 @@ const (
 	ReplyCmdNotSupported byte = 7
 )
 
-func readRequired(reader io.Reader, n int) (data []byte, err error) {
-	data = make([]byte, n)
-	_, err = io.ReadFull(reader, data)
-	return
-}
-
 func readSocksAddr(atype byte, reader io.Reader) (addr SocksAddr, err error) {
 	switch atype {
 	case ATypeIPV4:
-		addr.IP, err = readRequired(reader, 4)
+		addr.IP, err = util.ReadRequired(reader, 4)
 		if err != nil {
 			return
 		}
 	case ATypeIPV6:
-		addr.IP, err = readRequired(reader, 16)
+		addr.IP, err = util.ReadRequired(reader, 16)
 		if err != nil {
 			return
 		}
 	case ATypeDomain:
 		var buf []byte
-		buf, err = readRequired(reader, 1)
+		buf, err = util.ReadRequired(reader, 1)
 		if err != nil {
 			return
 		}
@@ -132,7 +127,7 @@ func readSocksAddr(atype byte, reader io.Reader) (addr SocksAddr, err error) {
 			return
 		}
 
-		buf, err = readRequired(reader, int(domainLen))
+		buf, err = util.ReadRequired(reader, int(domainLen))
 		if err != nil {
 			return
 		}
@@ -150,7 +145,7 @@ func readSocksAddr(atype byte, reader io.Reader) (addr SocksAddr, err error) {
 func readRequestOrReply(reader io.Reader) (cmdOrRep byte, addr SocksAddr, port uint16, err error) {
 	var buf []byte
 	// ver
-	buf, err = readRequired(reader, 4)
+	buf, err = util.ReadRequired(reader, 4)
 	if err != nil {
 		err = errors.Wrap(err, "readRequestOrReply: can not read header")
 		return
@@ -174,7 +169,7 @@ func readRequestOrReply(reader io.Reader) (cmdOrRep byte, addr SocksAddr, port u
 	}
 
 	// port
-	buf, err = readRequired(reader, 2)
+	buf, err = util.ReadRequired(reader, 2)
 	if err != nil {
 		err = errors.Wrap(err, "can not read port")
 		return

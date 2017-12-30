@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/account-login/socks_go/util"
 	log "github.com/cihub/seelog"
 	"github.com/pkg/errors"
 )
@@ -162,12 +163,11 @@ func (s *Server) cmdConnect(conn net.Conn, proto *ServerProtocol, addr SocksAddr
 		return
 	}
 
-	cr, cw := make(chan error, 2), make(chan error, 2)
-	go bridgeReaderWriter(tunnel, targetConn, cr)
-	go bridgeReaderWriter(targetConn, tunnel, cw)
+	cr := util.BridgeReaderWriter(tunnel, targetConn)
+	cw := util.BridgeReaderWriter(targetConn, tunnel)
 
 	// wait for client or target
-	merr := makeMultipleErrors()
+	merr := util.NewMultipleErrors()
 	select {
 	case rerr := <-cr:
 		merr.Add("ReadClient", rerr)
@@ -180,60 +180,4 @@ func (s *Server) cmdConnect(conn net.Conn, proto *ServerProtocol, addr SocksAddr
 	err = merr.ToError()
 
 	return
-}
-
-type multipleErrors map[string]error
-
-func (merr *multipleErrors) Error() string {
-	if len(*merr) == 1 {
-		for k, err := range *merr {
-			return fmt.Sprintf("%s: %v", k, err)
-		}
-	}
-
-	errstr := "Multiple errors:\n"
-	for k, err := range *merr {
-		errstr += fmt.Sprintf("\t%s: %v", k, err)
-	}
-	return errstr
-}
-
-func makeMultipleErrors() multipleErrors {
-	return multipleErrors(make(map[string]error))
-}
-
-func (merr *multipleErrors) Add(key string, err error) {
-	if err != nil {
-		(*merr)[key] = err
-	}
-}
-
-func (merr *multipleErrors) ToError() (err error) {
-	if len(*merr) > 0 {
-		return merr
-	} else {
-		return nil
-	}
-}
-
-func bridgeReaderWriter(reader io.Reader, writer io.Writer, errchan chan<- error) {
-	buf := make([]byte, 4096)
-	for {
-		n, err := reader.Read(buf)
-		var werr error
-		if n > 0 {
-			_, werr = writer.Write(buf[:n])
-		}
-
-		if err != nil || werr != nil {
-			rerr := err
-			if rerr == io.EOF {
-				rerr = nil
-			}
-
-			errchan <- rerr
-			errchan <- werr
-			return
-		}
-	}
 }

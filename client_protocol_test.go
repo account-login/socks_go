@@ -4,6 +4,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/account-login/socks_go/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,7 +46,7 @@ func TestClientProtocol_Conversation(t *testing.T) {
 	// tunnel
 	tunnel := proto.GetConnection()
 	tr.Send([]byte{1, 2, 3})
-	buf, err = readRequired(tunnel, 3)
+	buf, err = util.ReadRequired(tunnel, 3)
 	require.NoError(t, err)
 	assert.Equal(t, []byte{1, 2, 3}, buf)
 }

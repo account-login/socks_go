@@ -1,54 +1,22 @@
 package main
 
-import "os"
-
 import (
 	"flag"
-	"io"
 	"net"
-
+	"os"
 	"strconv"
 
 	"github.com/account-login/socks_go"
 	"github.com/account-login/socks_go/cmd"
+	"github.com/account-login/socks_go/util"
 	log "github.com/cihub/seelog"
 )
 
 const MethodMyExtended = socks_go.MethodPrivateBegin + 1
 
-// copied from server.go
-func bridgeReaderWriter(reader io.Reader, writer io.Writer, errchan chan<- error) {
-	buf := make([]byte, 4096)
-	for {
-		n, err := reader.Read(buf)
-		var werr error
-		if n > 0 {
-			_, werr = writer.Write(buf[:n])
-		}
-
-		if err != nil || werr != nil {
-			rerr := err
-			if rerr == io.EOF {
-				rerr = nil
-			}
-
-			errchan <- rerr
-			errchan <- werr
-			return
-		}
-	}
-}
-
-// copied from common_protocol.go
-func readRequired(reader io.Reader, n int) (data []byte, err error) {
-	data = make([]byte, n)
-	_, err = io.ReadFull(reader, data)
-	return
-}
-
 func extendedAuthHandler(proto *socks_go.ClientProtocol) (err error) {
 	var ip net.IP
-	ip, err = readRequired(proto.Transport, 4)
+	ip, err = util.ReadRequired(proto.Transport, 4)
 	if err == nil {
 		log.Infof("ip echo: %v", ip)
 	}
@@ -112,9 +80,8 @@ func realMain() int {
 	}
 
 	// tunnel stdin and stdout through proxy
-	l2r, r2l := make(chan error, 2), make(chan error, 2)
-	go bridgeReaderWriter(os.Stdin, tunnel, l2r)
-	go bridgeReaderWriter(tunnel, os.Stdout, r2l)
+	l2r := util.BridgeReaderWriter(os.Stdin, tunnel)
+	r2l := util.BridgeReaderWriter(tunnel, os.Stdout)
 
 	// error handling
 	hasErr := false

@@ -3,6 +3,7 @@ package socks_go
 import (
 	"io"
 
+	"github.com/account-login/socks_go/util"
 	"github.com/pkg/errors"
 )
 
@@ -45,7 +46,7 @@ func (proto *ServerProtocol) GetAuthMethods() (methods []byte, err error) {
 	}()
 
 	var buf []byte
-	buf, err = readRequired(proto.Transport, 2)
+	buf, err = util.ReadRequired(proto.Transport, 2)
 	if err != nil {
 		err = errors.Wrap(err, "can not read version and methods num")
 		return
@@ -60,7 +61,7 @@ func (proto *ServerProtocol) GetAuthMethods() (methods []byte, err error) {
 
 	// methods
 	numMethods := buf[1]
-	methods, err = readRequired(proto.Transport, int(numMethods))
+	methods, err = util.ReadRequired(proto.Transport, int(numMethods))
 	if err != nil {
 		err = errors.Wrapf(err, "can not read methods. num: %d", numMethods)
 		return

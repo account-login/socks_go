@@ -3,6 +3,7 @@ package socks_go
 import (
 	"io"
 
+	"github.com/account-login/socks_go/util"
 	"github.com/pkg/errors"
 )
 
@@ -67,7 +68,7 @@ func (proto *ClientProtocol) ReceiveAuthMethod() (method byte, err error) {
 	}()
 
 	var buf []byte
-	buf, err = readRequired(proto.Transport, 2)
+	buf, err = util.ReadRequired(proto.Transport, 2)
 	if err != nil {
 		err = errors.Wrap(err, "ReceiveAuthMethod: can not read data")
 		return
