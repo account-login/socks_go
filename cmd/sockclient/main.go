@@ -57,6 +57,13 @@ func extendedAuthHandler(proto *socks_go.ClientProtocol) (err error) {
 func realMain() int {
 	defer log.Flush()
 
+	fifoDefers := make([]func(), 0)
+	defer func() {
+		for _, f := range fifoDefers {
+			f()
+		}
+	}()
+
 	// parse args
 	proxyArg := flag.String("proxy", "127.0.0.1:1080", "socks5 proxy server")
 	flag.Parse()
@@ -84,6 +91,7 @@ func realMain() int {
 		log.Errorf("Dial to proxy failed: %v", err)
 		return 2
 	}
+	fifoDefers = append(fifoDefers, func() { conn.Close() })
 
 	// make socks5 client
 	client := socks_go.NewClient(
@@ -106,6 +114,7 @@ func realMain() int {
 	go bridgeReaderWriter(os.Stdin, tunnel, l2r)
 	go bridgeReaderWriter(tunnel, os.Stdout, r2l)
 
+	// error handling
 	hasErr := false
 	logErr := func(err error, local bool, reader bool) {
 		if err != nil {
@@ -122,20 +131,28 @@ func realMain() int {
 		}
 	}
 
-	select {
-	case rerr := <-l2r:
-		logErr(rerr, true, true)
-		logErr(<-l2r, true, false)
-	case rerr := <-r2l:
-		logErr(rerr, false, true)
-		logErr(<-r2l, false, false)
+	handleErr := func() {
+		select {
+		case rerr := <-l2r:
+			logErr(rerr, true, true)
+			logErr(<-l2r, true, false)
+			l2r = nil
+		case rerr := <-r2l:
+			logErr(rerr, false, true)
+			logErr(<-r2l, false, false)
+			r2l = nil
+		}
 	}
+
+	handleErr() // first channel of error
 
 	if hasErr {
+		fifoDefers = append(fifoDefers, handleErr) // second channel of error will be handled after close
 		return 3
+	} else {
+		handleErr() // one side finished, wait for another side
+		return 0
 	}
-
-	return 0
 }
 
 func main() {
