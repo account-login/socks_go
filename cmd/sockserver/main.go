@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/account-login/socks_go"
+	"github.com/account-login/socks_go/cmd"
 	log "github.com/cihub/seelog"
 )
 
@@ -61,6 +62,7 @@ func monitor() {
 
 func realMain() int {
 	defer log.Flush()
+	cmd.ConfigLogging()
 
 	addr := ":1080"
 	if len(os.Args) > 1 {
