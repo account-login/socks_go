@@ -97,7 +97,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		err = s.cmdConnect(conn, &proto, addr, port)
 	default:
 		err = errors.Errorf("unsupported cmd: %#x", cmd)
-		proto.RejectRequest(ReplyCmdNotSupported)
+		proto.RejectRequest(ReplyCmdNotSupported)	// ignore err
 	}
 	return
 }
@@ -162,7 +162,7 @@ func (s *Server) cmdConnect(conn net.Conn, proto *ServerProtocol, addr SocksAddr
 		return
 	}
 
-	cr, cw := make(chan error), make(chan error)
+	cr, cw := make(chan error, 2), make(chan error, 2)
 	go bridgeReaderWriter(tunnel, targetConn, cr)
 	go bridgeReaderWriter(targetConn, tunnel, cw)
 
@@ -171,7 +171,7 @@ func (s *Server) cmdConnect(conn net.Conn, proto *ServerProtocol, addr SocksAddr
 	select {
 	case rerr := <-cr:
 		merr.Add("ReadClient", rerr)
-		merr.Add("WriteClient", <-cr)
+		merr.Add("WriteTarget", <-cr)
 	case rerr := <-cw:
 		log.Debugf("target gone: %v", targetConn.RemoteAddr())
 		merr.Add("ReadTarget", rerr)

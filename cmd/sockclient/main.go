@@ -102,8 +102,7 @@ func realMain() int {
 	}
 
 	// tunnel stdin and stdout through proxy
-	l2r := make(chan error)
-	r2l := make(chan error)
+	l2r, r2l := make(chan error, 2), make(chan error, 2)
 	go bridgeReaderWriter(os.Stdin, tunnel, l2r)
 	go bridgeReaderWriter(tunnel, os.Stdout, r2l)
 
@@ -119,19 +118,17 @@ func realMain() int {
 			if !reader {
 				role = "writer"
 			}
-			log.Errorf("%s %s %s: %v", dir, role, err)
+			log.Errorf("%s %s error: %v", dir, role, err)
 		}
 	}
 
 	select {
 	case rerr := <-l2r:
 		logErr(rerr, true, true)
-		werr := <-l2r
-		logErr(werr, true, false)
+		logErr(<-l2r, true, false)
 	case rerr := <-r2l:
 		logErr(rerr, false, true)
-		werr := <-r2l
-		logErr(werr, false, false)
+		logErr(<-r2l, false, false)
 	}
 
 	if hasErr {
