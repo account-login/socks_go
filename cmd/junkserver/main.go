@@ -19,22 +19,27 @@ import (
 func runServer(bind string, script []junkchat.Action) error {
 	listener, err := net.Listen("tcp", bind)
 	if err != nil {
-		return errors.Wrapf(err, "runServer: listen(%q) error", bind)
+		return errors.Wrapf(err, "runServer█listen(%q) error", bind)
 	}
 
-	log.Infof("server started on: %v", listener.Addr())
+	log.Infof("runServer█server started on %v", listener.Addr())
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Errorf("runServer: Accept error: %v", err)
+			log.Errorf("runServerAccept error: %v", err)
 			continue
 		}
 
-		err = junkchat.ExecuteScript(script, conn)
-		if err != nil {
-			log.Errorf("runServer: ExecuteScript error: %v", err)
-		}
-		conn.Close()
+		log.Infof("runServer█client:%v█connected", conn.RemoteAddr())
+		go func() {
+			err := junkchat.ExecuteScript(script, conn)
+			if err != nil {
+				log.Errorf("runServer█client:%v█ExecuteScript error: %v", conn.RemoteAddr(), err)
+			} else {
+				log.Infof("runServer█client:%v█leave", conn.RemoteAddr())
+			}
+			conn.Close()
+		}()
 	}
 }
 
