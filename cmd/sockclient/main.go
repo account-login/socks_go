@@ -4,7 +4,6 @@ import (
 	"flag"
 	"net"
 	"os"
-	"strconv"
 
 	"github.com/account-login/socks_go"
 	"github.com/account-login/socks_go/cmd"
@@ -24,6 +23,7 @@ func extendedAuthHandler(proto *socks_go.ClientProtocol) (err error) {
 }
 
 func realMain() int {
+	// logging
 	defer log.Flush()
 	cmd.ConfigLogging()
 
@@ -43,17 +43,11 @@ func realMain() int {
 		return 1
 	}
 
-	host, portStr, err := net.SplitHostPort(target)
+	host, port, err := util.SplitHostPort(target)
 	if err != nil {
 		log.Errorf("can not parse host:port: %s", target)
 		return 4
 	}
-	portInt, err := strconv.ParseUint(portStr, 10, 16)
-	if err != nil {
-		log.Errorf("can not parse host:port: %s", target)
-		return 4
-	}
-	port := uint16(portInt)
 
 	// connect to proxy server
 	conn, err := net.Dial("tcp", *proxyArg)
