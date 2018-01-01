@@ -8,15 +8,26 @@ import (
 	"github.com/pkg/errors"
 )
 
+// from net.Conn
+type HasDeadline interface {
+	SetDeadline(time.Time) error
+}
+
 func ExecuteScript(acts []Action, transport io.ReadWriter) error {
+	conn, hasDeadline := transport.(HasDeadline)
 	for i, act := range acts {
+		if hasDeadline { // hack
+			// Read & Write may still block after act.Duration elapsed
+			_ = conn.SetDeadline(time.Now().Add(act.Duration + act.Duration/20))
+		}
+
 		rerr := doRead(act.Read, act.Duration, transport)
 		werr := doWrite(act.Write, act.Duration, transport)
 		if err := <-rerr; err != nil {
-			return errors.Wrapf(err, "ExecuteScript: reader error on %d-th action %v", i, act)
+			return errors.Wrapf(err, "ExecuteScript: reader error on %d-th action %+v", i, act)
 		}
 		if err := <-werr; err != nil {
-			return errors.Wrapf(err, "ExecuteScript: writer error on %d-th action %v", i, act)
+			return errors.Wrapf(err, "ExecuteScript: writer error on %d-th action %+v", i, act)
 		}
 	}
 	return nil
