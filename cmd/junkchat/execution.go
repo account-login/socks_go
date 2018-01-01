@@ -16,7 +16,7 @@ type HasDeadline interface {
 func ExecuteScript(acts []Action, transport io.ReadWriter) error {
 	conn, hasDeadline := transport.(HasDeadline)
 	for i, act := range acts {
-		if hasDeadline { // hack
+		if hasDeadline && act.Duration > 0 { // hack
 			// Read & Write may still block after act.Duration elapsed
 			_ = conn.SetDeadline(time.Now().Add(act.Duration + act.Duration/20))
 		}
@@ -24,10 +24,10 @@ func ExecuteScript(acts []Action, transport io.ReadWriter) error {
 		rerr := doRead(act.Read, act.Duration, transport)
 		werr := doWrite(act.Write, act.Duration, transport)
 		if err := <-rerr; err != nil {
-			return errors.Wrapf(err, "ExecuteScript: reader error on %d-th action %+v", i, act)
+			return errors.Wrapf(err, "ExecuteScript: reader error on %dth action %+v", i, act)
 		}
 		if err := <-werr; err != nil {
-			return errors.Wrapf(err, "ExecuteScript: writer error on %d-th action %+v", i, act)
+			return errors.Wrapf(err, "ExecuteScript: writer error on %dth action %+v", i, act)
 		}
 	}
 	return nil
