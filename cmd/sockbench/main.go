@@ -12,6 +12,8 @@ import (
 
 	"io"
 
+	"math"
+
 	"github.com/account-login/socks_go"
 	"github.com/account-login/socks_go/cmd"
 	"github.com/account-login/socks_go/cmd/junkchat"
@@ -25,9 +27,9 @@ type taskSession struct {
 	port   uint16
 	iofunc func(io.ReadWriter) error
 	// timestamp in nano seconds
-	reqTime     int64
-	connectTime int64
-	finishTime  int64
+	reqTime     time.Time
+	connectTime time.Time
+	finishTime  time.Time
 	// result
 	err error
 }
@@ -53,7 +55,7 @@ func worker(proxyAddr string, inq <-chan *taskSession, wg *sync.WaitGroup) {
 				}
 			}()
 
-			task.reqTime = time.Now().UnixNano()
+			task.reqTime = time.Now()
 
 			// connnect to proxy
 			conn, task.err = net.Dial("tcp", proxyAddr)
@@ -69,21 +71,21 @@ func worker(proxyAddr string, inq <-chan *taskSession, wg *sync.WaitGroup) {
 			if task.err != nil {
 				return
 			}
-			task.connectTime = time.Now().UnixNano()
+			task.connectTime = time.Now()
 
 			// do task
 			task.err = task.iofunc(tunnel)
-			task.finishTime = time.Now().UnixNano()
+			task.finishTime = time.Now()
 		}(task)
 	}
 }
 
-func nthValue(input []int, pos []float64) (result []int) {
+func nthValue(input []float64, pos []float64) (result []float64) {
 	if len(input) == 0 {
-		return make([]int, len(pos))
+		return make([]float64, len(pos))
 	}
 
-	sort.Ints(input)
+	sort.Float64s(input)
 	for _, val := range pos {
 		idx := util.RoundInt(val*float64(len(input)), 1)
 		if idx >= len(input) {
@@ -95,11 +97,11 @@ func nthValue(input []int, pos []float64) (result []int) {
 }
 
 func printStats(results []*taskSession) {
-	var startTime = int64(^uint64(0) >> 1)
-	var stopTime int64 = 0
+	var startTime = time.Unix(math.MaxInt32, 0) // maximum time
+	var stopTime = time.Unix(0, 0)
 	success := 0
-	connectTimes := make([]int, 0, len(results))
-	processTimes := make([]int, 0, len(results))
+	connectTimes := make([]float64, 0, len(results))
+	processTimes := make([]float64, 0, len(results))
 
 	for _, r := range results {
 		if r.err == nil {
@@ -108,21 +110,21 @@ func printStats(results []*taskSession) {
 			continue
 		}
 
-		if r.reqTime < startTime {
+		if r.reqTime.Before(startTime) {
 			startTime = r.reqTime
 		}
-		if r.finishTime > stopTime {
+		if r.finishTime.After(stopTime) {
 			stopTime = r.finishTime
 		}
 
-		connectTimes = append(connectTimes, int(r.connectTime-r.reqTime))
-		processTimes = append(processTimes, int(r.finishTime-r.reqTime))
+		connectTimes = append(connectTimes, r.connectTime.Sub(r.reqTime).Seconds())
+		processTimes = append(processTimes, r.finishTime.Sub(r.reqTime).Seconds())
 	}
 
 	log.Infof("success rate: %d/%d (%.4f)", success, len(results), float64(success)/float64(len(results)))
 
-	rps := float64(len(results)) / float64(stopTime-startTime) * 1e9
-	log.Infof("[duration:%f][reqs:%d][rps:%.1f]", float64(stopTime-startTime)/1e9, len(results), rps)
+	rps := float64(len(results)) / stopTime.Sub(startTime).Seconds()
+	log.Infof("[duration:%f][reqs:%d][rps:%.1f]", stopTime.Sub(startTime).Seconds(), len(results), rps)
 
 	distPos := []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1}
 	connectDist := nthValue(connectTimes, distPos)
@@ -134,9 +136,9 @@ func printStats(results []*taskSession) {
 	printDist(processDist, distPos)
 }
 
-func printDist(times []int, pos []float64) {
+func printDist(times []float64, pos []float64) {
 	for i, p := range pos {
-		log.Infof("[dist:%02.2f][time:%.3fms]", p, float64(times[i])/1e6)
+		log.Infof("[dist:%02.2f][time:%.3fms]", p, float64(times[i])*1e3)
 	}
 }
 
