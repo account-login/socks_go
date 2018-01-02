@@ -126,7 +126,7 @@ func printStats(results []*taskSession) {
 	rps := float64(len(results)) / stopTime.Sub(startTime).Seconds()
 	log.Infof("[duration:%f][reqs:%d][rps:%.1f]", stopTime.Sub(startTime).Seconds(), len(results), rps)
 
-	distPos := []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1}
+	distPos := []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1}
 	connectDist := nthValue(connectTimes, distPos)
 	processDist := nthValue(processTimes, distPos)
 
