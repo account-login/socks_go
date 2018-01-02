@@ -63,7 +63,7 @@ func worker(proxyAddr string, inq <-chan *taskSession, wg *sync.WaitGroup) {
 				return
 			}
 
-			addr = conn.LocalAddr().(*net.TCPAddr)
+			addr, _ = conn.LocalAddr().(*net.TCPAddr)
 
 			// create tunnel
 			client := socks_go.NewClient(conn, nil)
@@ -143,6 +143,8 @@ func printDist(times []float64, pos []float64) {
 }
 
 func run(proxyAddr string, workerNum int, works []*taskSession) {
+	log.Debugf("worker: %d", workerNum)
+
 	q := make(chan *taskSession, len(works))
 	var wg sync.WaitGroup
 	wg.Add(len(works))
