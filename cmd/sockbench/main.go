@@ -20,6 +20,8 @@ import (
 	"github.com/account-login/socks_go/util"
 	log "github.com/cihub/seelog"
 )
+import _ "net/http/pprof"
+import "net/http"
 
 type taskSession struct {
 	// req
@@ -34,49 +36,56 @@ type taskSession struct {
 	err error
 }
 
-func worker(proxyAddr string, inq <-chan *taskSession, wg *sync.WaitGroup) {
-	for task := range inq {
-		func(task *taskSession) {
-			var conn net.Conn
-			var tunnel io.ReadWriter
-			var addr *net.TCPAddr
+func doWork(proxyAddr string, task *taskSession, wg *sync.WaitGroup) {
+	var conn net.Conn
+	var tunnel io.ReadWriter
+	var addr *net.TCPAddr
 
-			defer func() {
-				if conn != nil {
-					err := conn.Close()
-					if err != nil {
-						log.Errorf("close conn err: %v", err)
-					}
-				}
-				wg.Done()
-
-				if task.err != nil {
-					log.Errorf("client: %v, error: %v", addr, task.err)
-				}
-			}()
-
-			task.reqTime = time.Now()
-
-			// connnect to proxy
-			conn, task.err = net.Dial("tcp", proxyAddr)
-			if task.err != nil {
-				return
+	defer func() {
+		if conn != nil {
+			err := conn.Close()
+			if err != nil {
+				log.Errorf("close conn err: %v", err)
 			}
+		}
+		wg.Done()
 
-			addr, _ = conn.LocalAddr().(*net.TCPAddr)
+		if task.err != nil {
+			log.Errorf("client: %v, error: %v", addr, task.err)
+		}
+	}()
 
-			// create tunnel
-			client := socks_go.NewClient(conn, nil)
-			tunnel, task.err = client.Connect(task.host, task.port)
-			if task.err != nil {
-				return
-			}
-			task.connectTime = time.Now()
+	task.reqTime = time.Now()
 
-			// do task
-			task.err = task.iofunc(tunnel)
-			task.finishTime = time.Now()
-		}(task)
+	// connnect to proxy
+	conn, task.err = net.Dial("tcp", proxyAddr)
+	if task.err != nil {
+		return
+	}
+
+	addr, _ = conn.LocalAddr().(*net.TCPAddr)
+
+	// create tunnel
+	client := socks_go.NewClient(conn, nil)
+	tunnel, task.err = client.Connect(task.host, task.port)
+	if task.err != nil {
+		return
+	}
+	task.connectTime = time.Now()
+
+	// do task
+	task.err = task.iofunc(tunnel)
+	task.finishTime = time.Now()
+}
+
+func worker(proxyAddr string, inq <-chan *taskSession, quit <-chan struct{}, wg *sync.WaitGroup) {
+	for {
+		select {
+		case <-quit:
+			return
+		case task := <-inq:
+			doWork(proxyAddr, task, wg)
+		}
 	}
 }
 
@@ -149,8 +158,9 @@ func run(proxyAddr string, workerNum int, works []*taskSession) {
 	var wg sync.WaitGroup
 	wg.Add(len(works))
 
+	quit := make(chan struct{})
 	for i := 0; i < workerNum; i++ {
-		go worker(proxyAddr, q, &wg)
+		go worker(proxyAddr, q, quit, &wg)
 	}
 
 	for _, task := range works {
@@ -158,6 +168,9 @@ func run(proxyAddr string, workerNum int, works []*taskSession) {
 	}
 
 	wg.Wait()
+	for i := 0; i < workerNum; i++ {
+		quit <- struct{}{}
+	}
 
 	// process results
 	printStats(works)
@@ -188,6 +201,7 @@ func realMain() int {
 	workerArg := flag.Int("worker", 16, "number of workers")
 	reqsArg := flag.Int("reqs", 1024, "number of requests")
 	scriptArg := flag.String("script", "", "scripts to run")
+	debugArg := flag.String("debug", ":6060", "http debug server")
 	flag.Parse()
 
 	junkHost, junkPort, err := util.SplitHostPort(*junkArg)
@@ -201,6 +215,14 @@ func realMain() int {
 		log.Errorf("parse script error: %v", err)
 		return 1
 	}
+
+	// debug server
+	go func() {
+		err := http.ListenAndServe(*debugArg, nil)
+		if err != nil {
+			log.Errorf("failed to start debug server: %v", err)
+		}
+	}()
 
 	// run benchmark
 	works := makeSessions(*reqsArg, script, junkHost, junkPort)
