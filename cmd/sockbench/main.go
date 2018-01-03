@@ -14,14 +14,15 @@ import (
 
 	"math"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/account-login/socks_go"
 	"github.com/account-login/socks_go/cmd"
 	"github.com/account-login/socks_go/cmd/junkchat"
 	"github.com/account-login/socks_go/util"
 	log "github.com/cihub/seelog"
 )
-import _ "net/http/pprof"
-import "net/http"
 
 type taskSession struct {
 	// req
@@ -78,14 +79,9 @@ func doWork(proxyAddr string, task *taskSession, wg *sync.WaitGroup) {
 	task.finishTime = time.Now()
 }
 
-func worker(proxyAddr string, inq <-chan *taskSession, quit <-chan struct{}, wg *sync.WaitGroup) {
-	for {
-		select {
-		case <-quit:
-			return
-		case task := <-inq:
-			doWork(proxyAddr, task, wg)
-		}
+func worker(proxyAddr string, inq <-chan *taskSession, wg *sync.WaitGroup) {
+	for task := range inq {
+		doWork(proxyAddr, task, wg)
 	}
 }
 
@@ -158,19 +154,16 @@ func run(proxyAddr string, workerNum int, works []*taskSession) {
 	var wg sync.WaitGroup
 	wg.Add(len(works))
 
-	quit := make(chan struct{})
 	for i := 0; i < workerNum; i++ {
-		go worker(proxyAddr, q, quit, &wg)
+		go worker(proxyAddr, q, &wg)
 	}
 
 	for _, task := range works {
 		q <- task
 	}
+	close(q)
 
 	wg.Wait()
-	for i := 0; i < workerNum; i++ {
-		quit <- struct{}{}
-	}
 
 	// process results
 	printStats(works)
