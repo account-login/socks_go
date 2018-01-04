@@ -14,9 +14,6 @@ import (
 
 	"math"
 
-	"net/http"
-	_ "net/http/pprof"
-
 	"github.com/account-login/socks_go"
 	"github.com/account-login/socks_go/cmd"
 	"github.com/account-login/socks_go/cmd/junkchat"
@@ -210,12 +207,7 @@ func realMain() int {
 	}
 
 	// debug server
-	go func() {
-		err := http.ListenAndServe(*debugArg, nil)
-		if err != nil {
-			log.Errorf("failed to start debug server: %v", err)
-		}
-	}()
+	cmd.StartDebugServer(*debugArg)
 
 	// run benchmark
 	works := makeSessions(*reqsArg, script, junkHost, junkPort)

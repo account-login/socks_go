@@ -28,6 +28,7 @@ func noAuthHandler(methods []byte, proto *ServerProtocol) error {
 	return proto.AcceptAuthMethod(MethodNone)
 }
 
+// TODO: quitable?
 func (s *Server) Run() (err error) {
 	listener, err := net.Listen("tcp", s.Addr)
 	if err != nil {
@@ -173,7 +174,7 @@ func (s *Server) cmdConnect(conn net.Conn, proto *ServerProtocol, addr SocksAddr
 		merr.Add("ReadClient", rerr)
 		merr.Add("WriteTarget", <-cr)
 	case rerr := <-cw:
-		log.Debugf("target gone: %v", targetConn.RemoteAddr())
+		log.Infof("target gone: %v", targetConn.RemoteAddr())
 		merr.Add("ReadTarget", rerr)
 		merr.Add("WriteClient", <-cw)
 	}

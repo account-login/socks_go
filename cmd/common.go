@@ -1,6 +1,11 @@
 package cmd
 
-import log "github.com/cihub/seelog"
+import (
+	"net/http"
+	_ "net/http/pprof"
+
+	log "github.com/cihub/seelog"
+)
 
 func ConfigLogging() {
 	logger, err := log.LoggerFromConfigAsString(`
@@ -21,4 +26,13 @@ func ConfigLogging() {
 	if err != nil {
 		log.Errorf("log.ReplaceLogger() failed: %v", err)
 	}
+}
+
+func StartDebugServer(addr string) {
+	go func() {
+		err := http.ListenAndServe(addr, nil)
+		if err != nil {
+			log.Errorf("failed to start debug server: %v", err)
+		}
+	}()
 }

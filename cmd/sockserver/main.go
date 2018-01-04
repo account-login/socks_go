@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"time"
 
+	"flag"
+
 	"github.com/account-login/socks_go"
 	"github.com/account-login/socks_go/cmd"
 	log "github.com/cihub/seelog"
@@ -49,6 +51,7 @@ func extenedAuthHandler(methods []byte, proto *socks_go.ServerProtocol) error {
 }
 
 func monitor() {
+	log.Infof("GOMAXPROCS: %d", runtime.GOMAXPROCS(0))
 	prev := 0
 	for {
 		now := runtime.NumGoroutine()
@@ -61,17 +64,19 @@ func monitor() {
 }
 
 func realMain() int {
+	// logging
 	defer log.Flush()
 	cmd.ConfigLogging()
 
-	addr := ":1080"
-	if len(os.Args) > 1 {
-		addr = os.Args[1]
-	}
+	// args
+	bindArg := flag.String("bind", ":1080", "bind on address")
+	debugArg := flag.String("debug", ":6061", "http debug server")
+	flag.Parse()
 
 	go monitor()
+	cmd.StartDebugServer(*debugArg)
 
-	server := socks_go.NewServer(addr, extenedAuthHandler)
+	server := socks_go.NewServer(*bindArg, extenedAuthHandler)
 	err := server.Run()
 	if err != nil {
 		log.Errorf("failed to start server: %v", err)
