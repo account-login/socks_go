@@ -101,3 +101,20 @@ func TestServerProtocol_RejectRequest(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []byte{0x05, 0x07, 0x00, 0x01, 0, 0, 0, 0, 0x00, 0x00}, tr.output)
 }
+
+func doUDPProtocolTest(t *testing.T, addr SocksAddr, port uint16, data []byte, msg []byte) {
+	assert.Equal(t, msg, MakeUDPProtocol(addr, port, data))
+
+	paddr, pport, pdata, err := ParseUDPProtocol(msg)
+	require.NoError(t, err)
+	assert.Equal(t, addr, paddr)
+	assert.Equal(t, pport, pport)
+	assert.Equal(t, pdata, data)
+}
+
+func TestUDPProtocol(t *testing.T) {
+	doUDPProtocolTest(t,
+		NewSocksAddrFromString("127.0.0.1"), 0x1234, []byte{0x56},
+		[]byte{0, 0, 0, 0x01, 0x7f, 0, 0, 1, 0x12, 0x34, 0x56},
+	)
+}

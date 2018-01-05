@@ -3,6 +3,9 @@ package socks_go
 import (
 	"io"
 
+	"bytes"
+	"encoding/binary"
+
 	"github.com/account-login/socks_go/util"
 	"github.com/pkg/errors"
 )
@@ -16,7 +19,9 @@ const (
 	PSAuth
 	PSAuthDone
 	PSReqConnectGot
+	PSReqUdpGot
 	PSCmdConnect
+	PSCmdUdp
 )
 
 type ServerProtocol struct {
@@ -102,7 +107,14 @@ func (proto *ServerProtocol) GetRequest() (cmd byte, addr SocksAddr, port uint16
 	proto.checkState(PSAuthDone)
 	defer func() {
 		if err == nil {
-			proto.State = PSReqConnectGot
+			switch cmd {
+			case CmdConnect:
+				proto.State = PSReqConnectGot
+			case CmdUDP:
+				proto.State = PSReqUdpGot
+			default:
+				proto.State = PSBad // cmd not supported
+			}
 		} else {
 			proto.State = PSBad
 		}
@@ -129,6 +141,20 @@ func (proto *ServerProtocol) AcceptConnection(bindAddr SocksAddr, bindPort uint1
 	return
 }
 
+func (proto *ServerProtocol) AcceptUdpAssociation(bindAddr SocksAddr, bindPort uint16) (err error) {
+	proto.checkState(PSReqUdpGot)
+	defer func() {
+		if err != nil {
+			proto.State = PSCmdUdp
+		} else {
+			proto.State = PSBad
+		}
+	}()
+
+	err = writeResponseOrRequest(proto.Transport, ReplyOK, bindAddr, bindPort)
+	return
+}
+
 func (proto *ServerProtocol) RejectRequest(reply byte) (err error) {
 	proto.checkState(PSReqConnectGot)
 	defer func() {
@@ -140,4 +166,48 @@ func (proto *ServerProtocol) RejectRequest(reply byte) (err error) {
 	}()
 
 	return writeResponseOrRequest(proto.Transport, reply, NewSocksAddr(), 0)
+}
+
+func ParseUDPProtocol(msg []byte) (addr SocksAddr, port uint16, data []byte, err error) {
+	if len(msg) < 4+4+2 {
+		err = errors.Errorf("udp request to short. size: %d", len(msg))
+		return
+	}
+
+	// frag
+	frag := msg[2]
+	if frag != 0 {
+		err = errors.Errorf("FRAG field not supported. frag: %d", frag)
+	}
+
+	// dst addr
+	reader := bytes.NewReader(msg[4:])
+	addr, err = readSocksAddr(msg[3], reader)
+	if err != nil {
+		err = errors.Wrapf(err, "can not read SocksAddr")
+		return
+	}
+
+	// dst port
+	var buf []byte
+	buf, err = util.ReadRequired(reader, 2)
+	if err != nil {
+		err = errors.Wrap(err, "can not read port")
+		return
+	}
+	port = binary.BigEndian.Uint16(buf)
+
+	data = make([]byte, reader.Len())
+	_, err = reader.Read(data) // err must be nil
+	return
+}
+
+func MakeUDPProtocol(addr SocksAddr, port uint16, data []byte) (msg []byte) {
+	msg = make([]byte, 0, 10+len(data))
+	msg = append(msg, 0, 0, 0)
+	msg = append(msg, addr.ToBytes()...)
+	msg = append(msg, 0, 0)
+	binary.BigEndian.PutUint16(msg[len(msg)-2:], port)
+	msg = append(msg, data...)
+	return
 }
