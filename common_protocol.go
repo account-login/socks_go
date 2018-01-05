@@ -33,7 +33,7 @@ func NewSocksAddrFromDomain(domain string) SocksAddr {
 
 func NewSocksAddrFromIP(ip net.IP) SocksAddr {
 	if ip4 := ip.To4(); ip4 != nil {
-		return NewSocksAddrFromIPV4(ip)
+		return NewSocksAddrFromIPV4(ip4)
 	} else {
 		return NewSocksAddrFromIPV6(ip.To16())
 	}
