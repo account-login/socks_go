@@ -27,13 +27,6 @@ func realMain() int {
 	defer log.Flush()
 	cmd.ConfigLogging()
 
-	fifoDefers := make([]func(), 0)
-	defer func() {
-		for _, f := range fifoDefers {
-			f()
-		}
-	}()
-
 	// parse args
 	proxyArg := flag.String("proxy", "127.0.0.1:1080", "socks5 proxy server")
 	flag.Parse()
@@ -49,13 +42,26 @@ func realMain() int {
 		return 4
 	}
 
+	// clean up connection
+	var conn net.Conn
+	var connClosed = false
+	doClose := func() {
+		if conn != nil && !connClosed {
+			err := conn.Close()
+			if err != nil {
+				log.Errorf("close proxy connection error: %v", err)
+			}
+			connClosed = true
+		}
+	}
+	defer doClose()
+
 	// connect to proxy server
-	conn, err := net.Dial("tcp", *proxyArg)
+	conn, err = net.Dial("tcp", *proxyArg)
 	if err != nil {
 		log.Errorf("Dial to proxy failed: %v", err)
 		return 2
 	}
-	fifoDefers = append(fifoDefers, func() { conn.Close() })
 
 	// make socks5 client
 	client := socks_go.NewClient(
@@ -78,44 +84,32 @@ func realMain() int {
 	r2l := util.BridgeReaderWriter(tunnel, os.Stdout)
 
 	// error handling
-	hasErr := false
-	logErr := func(err error, local bool, reader bool) {
+	retCode := 0
+	handleErr := func(err error, dir string, role string) {
 		if err != nil {
-			hasErr = true
-			dir := "local to remote"
-			if !local {
-				dir = "remote to local"
-			}
-			role := "reader"
-			if !reader {
-				role = "writer"
-			}
+			// logging
+			retCode = 3
 			log.Errorf("%s %s error: %v", dir, role, err)
+			// close connection to proxy on error
+			doClose()
 		}
 	}
 
-	handleErr := func() {
+	// poll for l2r & r2l
+	for i := 0; i < 2; i++ {
 		select {
 		case rerr := <-l2r:
-			logErr(rerr, true, true)
-			logErr(<-l2r, true, false)
+			handleErr(rerr, "local to remote", "reader")
+			handleErr(<-l2r, "local to remote", "writer")
 			l2r = nil
 		case rerr := <-r2l:
-			logErr(rerr, false, true)
-			logErr(<-r2l, false, false)
+			handleErr(rerr, "remote to local", "reader")
+			handleErr(<-r2l, "remote to local", "writer")
 			r2l = nil
 		}
 	}
 
-	handleErr() // first channel of error
-
-	if hasErr {
-		fifoDefers = append(fifoDefers, handleErr) // second channel of error will be handled after close
-		return 3
-	} else {
-		handleErr() // one side finished, wait for another side
-		return 0
-	}
+	return retCode
 }
 
 func main() {
