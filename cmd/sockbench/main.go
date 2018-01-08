@@ -38,6 +38,11 @@ type taskSession struct {
 	err error
 }
 
+type proxyParam struct {
+	addr    string
+	timeout time.Duration
+}
+
 // implement io.ReadWriter
 type bindedPacketConn struct {
 	net.PacketConn
@@ -66,7 +71,30 @@ func makeUDPAddrFromHostPort(host string, port uint16) (*net.UDPAddr, error) {
 	return addr, nil
 }
 
-func doWork(proxyAddr string, task *taskSession, wg *sync.WaitGroup) {
+func createTunnel(conn net.Conn, task *taskSession) <-chan io.ReadWriter {
+	ch := make(chan io.ReadWriter)
+	go func() {
+		var tunnel io.ReadWriter
+		client := socks_go.NewClient(conn, nil)
+		if task.udp {
+			udpAddr, err := makeUDPAddrFromHostPort(task.host, task.port)
+			if err != nil {
+				task.err = err
+			} else {
+				var UDPTunnel socks_go.ClientUDPTunnel
+				UDPTunnel, task.err = client.UDPAssociation()
+				tunnel = &bindedPacketConn{PacketConn: &UDPTunnel, Addr: udpAddr}
+			}
+		} else {
+			tunnel, task.err = client.Connect(task.host, task.port)
+		}
+
+		ch <- tunnel
+	}()
+	return ch
+}
+
+func doWork(proxy proxyParam, task *taskSession, wg *sync.WaitGroup) {
 	var conn net.Conn
 	var tunnel io.ReadWriter
 	var addr *net.TCPAddr
@@ -88,27 +116,20 @@ func doWork(proxyAddr string, task *taskSession, wg *sync.WaitGroup) {
 	task.reqTime = time.Now()
 
 	// connnect to proxy
-	conn, task.err = net.Dial("tcp", proxyAddr) // TODO: timeout
+	deadline := time.Now().Add(proxy.timeout)
+	conn, task.err = net.DialTimeout("tcp", proxy.addr, proxy.timeout)
 	if task.err != nil {
 		return
 	}
 
-	addr, _ = conn.LocalAddr().(*net.TCPAddr)
+	addr, _ = conn.LocalAddr().(*net.TCPAddr) // for logging
 
 	// create tunnel
-	client := socks_go.NewClient(conn, nil)
-	if task.udp {
-		addr, err := makeUDPAddrFromHostPort(task.host, task.port)
-		if err != nil {
-			task.err = err
-			return
-		}
-
-		var UDPTunnel socks_go.ClientUDPTunnel
-		UDPTunnel, task.err = client.UDPAssociation()
-		tunnel = &bindedPacketConn{PacketConn: &UDPTunnel, Addr: addr}
-	} else {
-		tunnel, task.err = client.Connect(task.host, task.port)
+	timeout := deadline.Sub(time.Now())
+	select {
+	case tunnel = <-createTunnel(conn, task):
+	case <-time.After(timeout):
+		task.err = errors.Errorf("createTunnel() timeout")
 	}
 
 	if task.err != nil {
@@ -122,9 +143,9 @@ func doWork(proxyAddr string, task *taskSession, wg *sync.WaitGroup) {
 	task.finishTime = time.Now()
 }
 
-func worker(proxyAddr string, inq <-chan *taskSession, wg *sync.WaitGroup) {
+func worker(proxy proxyParam, inq <-chan *taskSession, wg *sync.WaitGroup) {
 	for task := range inq {
-		doWork(proxyAddr, task, wg)
+		doWork(proxy, task, wg)
 	}
 }
 
@@ -190,7 +211,7 @@ func printDist(times []float64, pos []float64) {
 	}
 }
 
-func run(proxyAddr string, workerNum int, works []*taskSession) {
+func run(proxy proxyParam, workerNum int, works []*taskSession) {
 	log.Debugf("worker: %d", workerNum)
 
 	q := make(chan *taskSession, len(works))
@@ -198,7 +219,7 @@ func run(proxyAddr string, workerNum int, works []*taskSession) {
 	wg.Add(len(works))
 
 	for i := 0; i < workerNum; i++ {
-		go worker(proxyAddr, q, &wg)
+		go worker(proxy, q, &wg)
 	}
 
 	for _, task := range works {
@@ -243,6 +264,7 @@ func realMain() int {
 
 	// cli args
 	proxyArg := flag.String("proxy", "127.0.0.1:1080", "socks5 proxy server")
+	timeoutArg := flag.Int("timeout", 5000, "timeout in ms for tunnel creation")
 	junkArg := flag.String("junk", "127.0.0.1:2080", "junk servers seperated by comma")
 	workerArg := flag.Int("worker", 16, "number of workers")
 	reqsArg := flag.Int("reqs", 1024, "number of requests")
@@ -274,7 +296,7 @@ func realMain() int {
 
 	// run benchmark
 	works := makeSessions(*reqsArg, script, junkServers, *udpArg, *sizeArg)
-	run(*proxyArg, *workerArg, works)
+	run(proxyParam{*proxyArg, time.Duration(*timeoutArg) * time.Millisecond}, *workerArg, works)
 
 	return 0
 }
