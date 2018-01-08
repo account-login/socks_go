@@ -127,15 +127,15 @@ func realMain() int {
 		case err = <-tcpServerErr:
 			if err != nil {
 				log.Errorf("tcp server error: %v", err)
-				tcpServerErr = nil
 				retCode = 2
 			}
+			tcpServerErr = nil
 		case err = <-udpServerErr:
 			if err != nil {
 				log.Errorf("udp server error: %v", err)
-				udpServerErr = nil
 				retCode = 3
 			}
+			udpServerErr = nil
 		}
 	}
 
