@@ -19,6 +19,7 @@ import (
 	"github.com/account-login/socks_go/cmd/junkchat"
 	"github.com/account-login/socks_go/util"
 	log "github.com/cihub/seelog"
+	"github.com/pkg/errors"
 )
 
 type taskSession struct {
@@ -26,12 +27,41 @@ type taskSession struct {
 	host   string
 	port   uint16
 	iofunc func(io.ReadWriter) error
+	udp    bool
 	// timestamp in nano seconds
 	reqTime     time.Time
 	connectTime time.Time
 	finishTime  time.Time
 	// result
 	err error
+}
+
+// implement io.ReadWriter
+type bindedPacketConn struct {
+	net.PacketConn
+	Addr *net.UDPAddr
+}
+
+func (conn *bindedPacketConn) Read(buf []byte) (n int, err error) {
+	n, _, err = conn.ReadFrom(buf)
+	return
+}
+
+func (conn *bindedPacketConn) Write(buf []byte) (n int, err error) {
+	n, err = conn.WriteTo(buf, conn.Addr)
+	return
+}
+
+func makeUDPAddrFromHostPort(host string, port uint16) (*net.UDPAddr, error) {
+	ipAddr, err := net.ResolveIPAddr("ip", host)
+	if err != nil {
+		return nil, errors.Wrapf(err, "makeUDPAddrFromHostPort: ResolveIPAddr error for %q", host)
+	}
+
+	addr := &net.UDPAddr{}
+	addr.IP = ipAddr.IP
+	addr.Port = int(port)
+	return addr, nil
 }
 
 func doWork(proxyAddr string, task *taskSession, wg *sync.WaitGroup) {
@@ -65,10 +95,24 @@ func doWork(proxyAddr string, task *taskSession, wg *sync.WaitGroup) {
 
 	// create tunnel
 	client := socks_go.NewClient(conn, nil)
-	tunnel, task.err = client.Connect(task.host, task.port)
+	if task.udp {
+		addr, err := makeUDPAddrFromHostPort(task.host, task.port)
+		if err != nil {
+			task.err = err
+			return
+		}
+
+		var UDPTunnel socks_go.ClientUDPTunnel
+		UDPTunnel, task.err = client.UDPAssociation()
+		tunnel = &bindedPacketConn{PacketConn: &UDPTunnel, Addr: addr}
+	} else {
+		tunnel, task.err = client.Connect(task.host, task.port)
+	}
+
 	if task.err != nil {
 		return
 	}
+
 	task.connectTime = time.Now()
 
 	// do task
@@ -166,15 +210,19 @@ func run(proxyAddr string, workerNum int, works []*taskSession) {
 	printStats(works)
 }
 
-func makeSessions(n int, script []junkchat.Action, host string, port uint16) (works []*taskSession) {
+func makeSessions(n int, script []junkchat.Action, host string, port uint16, udp bool, size int) (works []*taskSession) {
 	for i := 0; i < n; i++ {
 		iofunc := func(transport io.ReadWriter) (err error) {
 			//log.Debugf("iofunc begin: %d", i)
-			err = junkchat.ExecuteScript(script, transport)
+			if udp {
+				err = junkchat.ExecutePacketScript(script, transport, size)
+			} else {
+				err = junkchat.ExecuteScript(script, transport)
+			}
 			//log.Debugf("iofunc finish: %d", i)
 			return
 		}
-		works = append(works, &taskSession{host: host, port: port, iofunc: iofunc})
+		works = append(works, &taskSession{host: host, port: port, iofunc: iofunc, udp: udp})
 	}
 	return
 }
@@ -190,7 +238,10 @@ func realMain() int {
 	junkArg := flag.String("junk", "127.0.0.1:2080", "junk server")
 	workerArg := flag.Int("worker", 16, "number of workers")
 	reqsArg := flag.Int("reqs", 1024, "number of requests")
-	scriptArg := flag.String("script", "", "scripts to run")
+	udpArg := flag.Bool("udp", false, "run in UDP mode")
+	sizeArg := flag.Int("size", 1024, "send packet size in UDP")
+	scriptArg := flag.String("script", "", `scripts to run
+		In TCP mode, the unit is bytes. In UDP mode, the unit is number of packets`)
 	debugArg := flag.String("debug", ":6060", "http debug server")
 	flag.Parse()
 
@@ -210,7 +261,7 @@ func realMain() int {
 	cmd.StartDebugServer(*debugArg)
 
 	// run benchmark
-	works := makeSessions(*reqsArg, script, junkHost, junkPort)
+	works := makeSessions(*reqsArg, script, junkHost, junkPort, *udpArg, *sizeArg)
 	run(*proxyArg, *workerArg, works)
 
 	return 0
