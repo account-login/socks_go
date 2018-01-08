@@ -88,7 +88,7 @@ func doWork(proxyAddr string, task *taskSession, wg *sync.WaitGroup) {
 	task.reqTime = time.Now()
 
 	// connnect to proxy
-	conn, task.err = net.Dial("tcp", proxyAddr)
+	conn, task.err = net.Dial("tcp", proxyAddr) // TODO: timeout
 	if task.err != nil {
 		return
 	}

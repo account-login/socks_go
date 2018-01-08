@@ -64,7 +64,7 @@ func realMain() int {
 	defer doClose()
 
 	// connect to proxy server
-	conn, err = net.Dial("tcp", *proxyArg)
+	conn, err = net.Dial("tcp", *proxyArg) // TODO: timeout
 	if err != nil {
 		log.Errorf("Dial to proxy failed: %v", err)
 		return 2

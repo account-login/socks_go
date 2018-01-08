@@ -110,6 +110,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 }
 
 func makeConnection(addr SocksAddr, port uint16) (net.Conn, error) {
+	// TODO: timeout
 	return net.Dial("tcp", fmt.Sprintf("%v:%d", addr, port))
 }
 
@@ -127,13 +128,7 @@ func parseNetAddr(netAddr net.Addr) (addr SocksAddr, port uint16, err error) {
 		return
 	}
 
-	if ip := rawIP.To4(); ip != nil {
-		addr = NewSocksAddrFromIPV4(ip)
-	} else if ip := rawIP.To16(); ip != nil {
-		addr = NewSocksAddrFromIPV6(ip)
-	} else {
-		err = errors.Errorf("bad ip: %v", rawIP)
-	}
+	addr = NewSocksAddrFromIP(rawIP)
 	return
 }
 
