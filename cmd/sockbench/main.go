@@ -116,6 +116,7 @@ func doWork(proxy proxyParam, task *taskSession, wg *sync.WaitGroup) {
 	task.reqTime = time.Now()
 
 	// connnect to proxy
+	// TODO: move timeout control to Client
 	deadline := time.Now().Add(proxy.timeout)
 	conn, task.err = net.DialTimeout("tcp", proxy.addr, proxy.timeout)
 	if task.err != nil {
@@ -211,7 +212,7 @@ func printDist(times []float64, pos []float64) {
 	}
 }
 
-func run(proxy proxyParam, workerNum int, works []*taskSession) {
+func run(proxy proxyParam, connRate float64, workerNum int, works []*taskSession) {
 	log.Debugf("worker: %d", workerNum)
 
 	q := make(chan *taskSession, len(works))
@@ -222,10 +223,20 @@ func run(proxy proxyParam, workerNum int, works []*taskSession) {
 		go worker(proxy, q, &wg)
 	}
 
-	// TODO: limit rate here
-	for _, task := range works {
-		q <- task
+	// limit connect rate
+	tl := junkchat.TimeLimit{
+		Total: len(works),
+		Step:  1,
+		Limit: time.Duration(float64(len(works))/connRate) * time.Second,
 	}
+	start := 0
+	tl.DoWork(func(n int) (int, error) {
+		for i := start; i < start+n; i++ {
+			q <- works[i]
+		}
+		start += n
+		return n, nil
+	})
 	close(q)
 
 	wg.Wait()
@@ -267,12 +278,13 @@ func realMain() int {
 	proxyArg := flag.String("proxy", "127.0.0.1:1080", "socks5 proxy server")
 	timeoutArg := flag.Int("timeout", 5000, "timeout in ms for tunnel creation")
 	junkArg := flag.String("junk", "127.0.0.1:2080", "junk servers seperated by comma")
+	connectRateArg := flag.Float64("connect-rate", math.MaxFloat64, "maximum number of new connection per second")
 	workerArg := flag.Int("worker", 16, "number of workers")
 	reqsArg := flag.Int("reqs", 1024, "number of requests")
 	udpArg := flag.Bool("udp", false, "run in UDP mode")
 	sizeArg := flag.Int("size", 1024, "send packet size in UDP")
 	scriptArg := flag.String("script", "", `scripts to run
-		In TCP mode, the unit is bytes. In UDP mode, the unit is number of packets`)
+		In TCP mode, the unit is bytes. In UDP mode, the unit is the number of packets`)
 	debugArg := flag.String("debug", ":6060", "http debug server")
 	flag.Parse()
 
@@ -297,7 +309,11 @@ func realMain() int {
 
 	// run benchmark
 	works := makeSessions(*reqsArg, script, junkServers, *udpArg, *sizeArg)
-	run(proxyParam{*proxyArg, time.Duration(*timeoutArg) * time.Millisecond}, *workerArg, works)
+	run(
+		proxyParam{*proxyArg, time.Duration(*timeoutArg) * time.Millisecond},
+		*connectRateArg,
+		*workerArg, works,
+	)
 
 	return 0
 }

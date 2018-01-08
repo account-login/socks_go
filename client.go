@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// TODO: timeout
 type ClientParam struct {
 	FixUDPAddr bool
 }
