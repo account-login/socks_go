@@ -13,14 +13,13 @@ type HasDeadline interface {
 	SetDeadline(time.Time) error
 }
 
-// TODO: add deadline param
 // TODO: code reuse
 func ExecutePacketScript(acts []Action, transport io.ReadWriter, size int) error {
 	conn, hasDeadline := transport.(HasDeadline)
 	for i, act := range acts {
-		if hasDeadline && act.Duration > 0 { // hack
+		if hasDeadline && act.Deadline > 0 { // hack
 			// Read & Write may still block after act.Duration elapsed
-			_ = conn.SetDeadline(time.Now().Add(act.Duration + act.Duration/20))
+			_ = conn.SetDeadline(time.Now().Add(act.Deadline))
 		}
 
 		rerr := doReadPacket(act.Read, act.Duration, transport)

@@ -10,6 +10,7 @@ import (
 
 type Action struct {
 	Duration time.Duration
+	Deadline time.Duration
 	Read     int // bytes
 	Write    int
 }
@@ -63,13 +64,17 @@ func ParseScript(input string) (acts []Action, err error) {
 			}
 
 			switch op {
-			case 't':
+			case 't', 'd':
 				unit, ok := timeUnits[remain]
 				if !ok {
 					err = errors.Errorf("bad duration unit at #%d", i)
 					return
 				}
-				act.Duration = time.Millisecond * time.Duration(num*unit)
+				if op == 't' {
+					act.Duration = time.Millisecond * time.Duration(num*unit)
+				} else {
+					act.Deadline = time.Millisecond * time.Duration(num*unit)
+				}
 			case 'r', 'w':
 				unit, ok := sizeUnits[remain]
 				if !ok {
