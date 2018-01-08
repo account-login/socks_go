@@ -115,20 +115,16 @@ func makeConnection(addr SocksAddr, port uint16) (net.Conn, error) {
 }
 
 func parseNetAddr(netAddr net.Addr) (addr SocksAddr, port uint16, err error) {
-	var rawIP net.IP
 	switch concreteAddr := netAddr.(type) {
 	case *net.TCPAddr:
-		rawIP = concreteAddr.IP
+		addr = NewSocksAddrFromIP(concreteAddr.IP)
 		port = uint16(concreteAddr.Port)
 	case *net.UDPAddr:
-		rawIP = concreteAddr.IP
+		addr = NewSocksAddrFromIP(concreteAddr.IP)
 		port = uint16(concreteAddr.Port)
 	default:
 		err = errors.Errorf("unknown addr: %v (%T)", netAddr, netAddr)
-		return
 	}
-
-	addr = NewSocksAddrFromIP(rawIP)
 	return
 }
 
