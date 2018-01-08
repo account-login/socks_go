@@ -32,7 +32,7 @@ func runTCPServer(bind string, script []junkchat.Action) error {
 
 		log.Infof("runTCPServer█client:%v█connected", conn.RemoteAddr())
 		go func() {
-			err := junkchat.ExecuteScript(script, conn)
+			err := junkchat.ExecuteStreamScript(script, conn)
 			if err != nil {
 				log.Errorf("runTCPServer█client:%v█ExecuteScript error: %v", conn.RemoteAddr(), err)
 			} else {

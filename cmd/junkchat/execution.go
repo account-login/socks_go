@@ -13,8 +13,10 @@ type HasDeadline interface {
 	SetDeadline(time.Time) error
 }
 
-// TODO: code reuse
-func ExecutePacketScript(acts []Action, transport io.ReadWriter, size int) error {
+type readerFunc func(int, time.Duration, io.Reader) chan error
+type writerFunc func(int, time.Duration, io.Writer) chan error
+
+func executePacketScriptGeneric(acts []Action, transport io.ReadWriter, readFunc readerFunc, writeFunc writerFunc) error {
 	conn, hasDeadline := transport.(HasDeadline)
 	for i, act := range acts {
 		if hasDeadline && act.Deadline > 0 { // hack
@@ -22,28 +24,8 @@ func ExecutePacketScript(acts []Action, transport io.ReadWriter, size int) error
 			_ = conn.SetDeadline(time.Now().Add(act.Deadline))
 		}
 
-		rerr := doReadPacket(act.Read, act.Duration, transport)
-		werr := doWritePacket(act.Write, act.Duration, transport, size)
-		if err := <-rerr; err != nil {
-			return errors.Wrapf(err, "ExecutePacketScript: reader error on %dth action %+v", i, act)
-		}
-		if err := <-werr; err != nil {
-			return errors.Wrapf(err, "ExecutePacketScript: writer error on %dth action %+v", i, act)
-		}
-	}
-	return nil
-}
-
-func ExecuteScript(acts []Action, transport io.ReadWriter) error {
-	conn, hasDeadline := transport.(HasDeadline)
-	for i, act := range acts {
-		if hasDeadline && act.Duration > 0 { // hack
-			// Read & Write may still block after act.Duration elapsed
-			_ = conn.SetDeadline(time.Now().Add(act.Duration + act.Duration/20))
-		}
-
-		rerr := doRead(act.Read, act.Duration, transport)
-		werr := doWrite(act.Write, act.Duration, transport)
+		rerr := readFunc(act.Read, act.Duration, transport)
+		werr := writeFunc(act.Write, act.Duration, transport)
 		if err := <-rerr; err != nil {
 			return errors.Wrapf(err, "ExecuteScript: reader error on %dth action %+v", i, act)
 		}
@@ -52,6 +34,20 @@ func ExecuteScript(acts []Action, transport io.ReadWriter) error {
 		}
 	}
 	return nil
+}
+
+func sizedPacketWriter(size int) writerFunc {
+	return func(n int, duration time.Duration, writer io.Writer) chan error {
+		return doWritePacket(n, duration, writer, size)
+	}
+}
+
+func ExecutePacketScript(acts []Action, transport io.ReadWriter, size int) error {
+	return executePacketScriptGeneric(acts, transport, doReadPacket, sizedPacketWriter(size))
+}
+
+func ExecuteStreamScript(acts []Action, transport io.ReadWriter) error {
+	return executePacketScriptGeneric(acts, transport, doRead, doWrite)
 }
 
 const (

@@ -217,7 +217,7 @@ func makeSessions(n int, script []junkchat.Action, host string, port uint16, udp
 			if udp {
 				err = junkchat.ExecutePacketScript(script, transport, size)
 			} else {
-				err = junkchat.ExecuteScript(script, transport)
+				err = junkchat.ExecuteStreamScript(script, transport)
 			}
 			//log.Debugf("iofunc finish: %d", i)
 			return
