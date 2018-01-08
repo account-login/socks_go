@@ -5,6 +5,8 @@ import (
 	"net"
 	"os"
 
+	"io/ioutil"
+
 	"github.com/account-login/socks_go"
 	"github.com/account-login/socks_go/cmd"
 	"github.com/account-login/socks_go/util"
@@ -29,12 +31,17 @@ func realMain() int {
 
 	// parse args
 	proxyArg := flag.String("proxy", "127.0.0.1:1080", "socks5 proxy server")
+	udpArg := flag.Bool("udp", false, "UDP mode")
+	debugArg := flag.String("debug", ":6062", "http debug server")
+
 	flag.Parse()
 	target := flag.Arg(0)
 	if len(target) == 0 {
 		log.Errorf("must specify target address")
 		return 1
 	}
+
+	cmd.StartDebugServer(*debugArg)
 
 	host, port, err := util.SplitHostPort(target)
 	if err != nil {
@@ -72,10 +79,18 @@ func realMain() int {
 		},
 	)
 
+	if *udpArg {
+		return doUDP(&client, host, port, doClose)
+	} else {
+		return doTCP(&client, host, port, doClose)
+	}
+}
+
+func doTCP(client *socks_go.Client, host string, port uint16, doClose func()) int {
 	// issue command to server
 	tunnel, err := client.Connect(host, port)
 	if err != nil {
-		log.Errorf("client.Connect(%v) failed: %v", target, err)
+		log.Errorf("client.Connect(%s:%d) failed: %v", host, port, err)
 		return 3
 	}
 
@@ -110,6 +125,47 @@ func realMain() int {
 	}
 
 	return retCode
+}
+
+func doUDP(client *socks_go.Client, host string, port uint16, doClose func()) int {
+	tunnel, err := client.UDPAssociation()
+	if err != nil {
+		log.Errorf("client.UDPAssociation() error: %v", err)
+		return 3
+	}
+
+	data, err := ioutil.ReadAll(os.Stdin)
+	if err != nil {
+		log.Errorf("read stdin error: %v", err)
+		return 3
+	}
+
+	n, err := tunnel.WriteToSocksAddr(data, socks_go.NewSocksAddrFromString(host), port)
+	if err != nil {
+		log.Errorf("tunnel.WriteToSocksAddr() error: %v", err)
+		return 3
+	}
+
+	if n != len(data) {
+		log.Errorf("short write: %d/%d bytes", n, len(data))
+		return 3
+	}
+
+	buf := make([]byte, 64*1024)
+	n, netAddr, err := tunnel.ReadFrom(buf)
+	if err != nil {
+		log.Errorf("tunnel.ReadFrom() error: %v", err)
+		return 3
+	}
+
+	log.Infof("udp reply from: %v", netAddr)
+
+	n, err = os.Stdout.Write(buf[:n])
+	if err != nil {
+		log.Errorf("write stdout error: %v", err)
+	}
+
+	return 0
 }
 
 func main() {
