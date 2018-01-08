@@ -14,6 +14,8 @@ import (
 
 	"math"
 
+	"strings"
+
 	"github.com/account-login/socks_go"
 	"github.com/account-login/socks_go/cmd"
 	"github.com/account-login/socks_go/cmd/junkchat"
@@ -210,7 +212,12 @@ func run(proxyAddr string, workerNum int, works []*taskSession) {
 	printStats(works)
 }
 
-func makeSessions(n int, script []junkchat.Action, host string, port uint16, udp bool, size int) (works []*taskSession) {
+type hostPortPair struct {
+	host string
+	port uint16
+}
+
+func makeSessions(n int, script []junkchat.Action, junkServers []hostPortPair, udp bool, size int) (works []*taskSession) {
 	for i := 0; i < n; i++ {
 		iofunc := func(transport io.ReadWriter) (err error) {
 			//log.Debugf("iofunc begin: %d", i)
@@ -222,7 +229,9 @@ func makeSessions(n int, script []junkchat.Action, host string, port uint16, udp
 			//log.Debugf("iofunc finish: %d", i)
 			return
 		}
-		works = append(works, &taskSession{host: host, port: port, iofunc: iofunc, udp: udp})
+
+		pair := junkServers[i%len(junkServers)]
+		works = append(works, &taskSession{host: pair.host, port: pair.port, iofunc: iofunc, udp: udp})
 	}
 	return
 }
@@ -234,8 +243,7 @@ func realMain() int {
 
 	// cli args
 	proxyArg := flag.String("proxy", "127.0.0.1:1080", "socks5 proxy server")
-	// TODO: multiple junk server
-	junkArg := flag.String("junk", "127.0.0.1:2080", "junk server")
+	junkArg := flag.String("junk", "127.0.0.1:2080", "junk servers seperated by comma")
 	workerArg := flag.Int("worker", 16, "number of workers")
 	reqsArg := flag.Int("reqs", 1024, "number of requests")
 	udpArg := flag.Bool("udp", false, "run in UDP mode")
@@ -245,10 +253,14 @@ func realMain() int {
 	debugArg := flag.String("debug", ":6060", "http debug server")
 	flag.Parse()
 
-	junkHost, junkPort, err := util.SplitHostPort(*junkArg)
-	if err != nil {
-		log.Errorf("can not parse -junk host:port : %v", err)
-		return 2
+	junkServers := make([]hostPortPair, 0)
+	for _, junkSv := range strings.Split(*junkArg, ",") {
+		host, port, err := util.SplitHostPort(junkSv)
+		if err != nil {
+			log.Errorf("can not parse host:port pair %q : %v", junkSv, err)
+			return 2
+		}
+		junkServers = append(junkServers, hostPortPair{host, port})
 	}
 
 	script, err := junkchat.ParseScript(*scriptArg)
@@ -261,7 +273,7 @@ func realMain() int {
 	cmd.StartDebugServer(*debugArg)
 
 	// run benchmark
-	works := makeSessions(*reqsArg, script, junkHost, junkPort, *udpArg, *sizeArg)
+	works := makeSessions(*reqsArg, script, junkServers, *udpArg, *sizeArg)
 	run(*proxyArg, *workerArg, works)
 
 	return 0
