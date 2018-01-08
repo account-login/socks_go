@@ -32,7 +32,9 @@ func StartDebugServer(addr string) {
 	go func() {
 		err := http.ListenAndServe(addr, nil)
 		if err != nil {
-			log.Errorf("failed to start debug server: %v", err)
+			log.Errorf("failed to start debug server on %v: %v", addr, err)
+		} else {
+			log.Debugf("debug server started on %v", addr)
 		}
 	}()
 }
