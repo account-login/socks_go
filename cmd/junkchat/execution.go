@@ -50,7 +50,7 @@ func getJunk(size int) []byte {
 	if size > len(junkPool) {
 		panic("huge size")
 	}
-	idx := rand.Intn(len(junkPool) - size)
+	idx := rand.Intn(len(junkPool) - size + 1)
 	return junkPool[idx : idx+size]
 }
 
