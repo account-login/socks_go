@@ -75,7 +75,7 @@ func createTunnel(conn net.Conn, task *taskSession) <-chan io.ReadWriter {
 	ch := make(chan io.ReadWriter)
 	go func() {
 		var tunnel io.ReadWriter
-		client := socks_go.NewClient(conn, nil)
+		client := socks_go.NewClientWithParam(conn, nil, socks_go.ClientParam{FixUDPAddr: true})
 		if task.udp {
 			udpAddr, err := makeUDPAddrFromHostPort(task.host, task.port)
 			if err != nil {
@@ -222,6 +222,7 @@ func run(proxy proxyParam, workerNum int, works []*taskSession) {
 		go worker(proxy, q, &wg)
 	}
 
+	// TODO: limit rate here
 	for _, task := range works {
 		q <- task
 	}

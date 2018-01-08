@@ -11,9 +11,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+type ClientParam struct {
+	FixUDPAddr bool
+}
+
 type Client struct {
 	protocol     ClientProtocol
 	authHandlers map[byte]ClientAuthHandlerFunc
+	param        ClientParam
 }
 
 type ClientAuthHandlerFunc func(proto *ClientProtocol) error
@@ -25,13 +30,21 @@ type ClientTunnel struct {
 	BindPort uint16
 }
 
-func NewClient(transport io.ReadWriter, authHandlers map[byte]ClientAuthHandlerFunc) Client {
+func NewClientWithParam(transport io.ReadWriter, authHandlers map[byte]ClientAuthHandlerFunc, param ClientParam) Client {
 	if len(authHandlers) == 0 {
 		authHandlers = map[byte]ClientAuthHandlerFunc{
 			MethodNone: ClientNoAuthHandler,
 		}
 	}
-	return Client{NewClientProtocol(transport), authHandlers}
+	return Client{
+		protocol:     NewClientProtocol(transport),
+		authHandlers: authHandlers,
+		param:        param,
+	}
+}
+
+func NewClient(transport io.ReadWriter, authHandlers map[byte]ClientAuthHandlerFunc) Client {
+	return NewClientWithParam(transport, authHandlers, ClientParam{})
 }
 
 func ClientNoAuthHandler(proto *ClientProtocol) error {
@@ -132,8 +145,8 @@ func (c *Client) UDPAssociation() (tunnel ClientUDPTunnel, err error) {
 	}
 
 	tunnel.server = &net.UDPAddr{IP: tunnel.BindAddr.IP, Port: int(tunnel.BindPort)}
-	if tunnel.server.IP.IsUnspecified() {
-		// fix 0.0.0.0 address
+	if c.param.FixUDPAddr || tunnel.server.IP.IsUnspecified() {
+		// fix udp address
 		type HasRemoteAddr interface {
 			RemoteAddr() net.Addr
 		}
