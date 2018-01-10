@@ -26,10 +26,11 @@ import (
 
 type taskSession struct {
 	// req
-	host   string
-	port   uint16
-	iofunc func(io.ReadWriter) error
-	udp    bool
+	host      string
+	port      uint16
+	iofunc    func(io.ReadWriter) error
+	udp       bool
+	localAddr *net.TCPAddr
 	// timestamp in nano seconds
 	reqTime     time.Time
 	connectTime time.Time
@@ -118,7 +119,10 @@ func doWork(proxy proxyParam, task *taskSession, wg *sync.WaitGroup) {
 	// connnect to proxy
 	// TODO: move timeout control to Client
 	deadline := time.Now().Add(proxy.timeout)
-	conn, task.err = net.DialTimeout("tcp", proxy.addr, proxy.timeout)
+	conn, task.err = (&net.Dialer{
+		Timeout:   proxy.timeout,
+		LocalAddr: task.localAddr,
+	}).Dial("tcp", proxy.addr)
 	if task.err != nil {
 		return
 	}
@@ -250,7 +254,14 @@ type hostPortPair struct {
 	port uint16
 }
 
-func makeSessions(n int, script []junkchat.Action, junkServers []hostPortPair, udp bool, size int) (works []*taskSession) {
+func makeSessions(
+	n int,
+	script []junkchat.Action,
+	junkServers []hostPortPair,
+	localAddrs []*net.TCPAddr,
+	udp bool,
+	size int) (works []*taskSession) {
+
 	for i := 0; i < n; i++ {
 		iofunc := func(transport io.ReadWriter) (err error) {
 			//log.Debugf("iofunc begin: %d", i)
@@ -264,7 +275,14 @@ func makeSessions(n int, script []junkchat.Action, junkServers []hostPortPair, u
 		}
 
 		pair := junkServers[i%len(junkServers)]
-		works = append(works, &taskSession{host: pair.host, port: pair.port, iofunc: iofunc, udp: udp})
+		var addr *net.TCPAddr
+		if len(localAddrs) != 0 {
+			addr = localAddrs[i%len(localAddrs)]
+		}
+		works = append(works, &taskSession{
+			host: pair.host, port: pair.port, localAddr: addr,
+			iofunc: iofunc, udp: udp,
+		})
 	}
 	return
 }
@@ -278,6 +296,7 @@ func realMain() int {
 	proxyArg := flag.String("proxy", "127.0.0.1:1080", "socks5 proxy server")
 	timeoutArg := flag.Int("timeout", 5000, "timeout in ms for tunnel creation")
 	junkArg := flag.String("junk", "127.0.0.1:2080", "junk servers seperated by comma")
+	localArg := flag.String("local", "", "local source addresses seperated by comma")
 	connectRateArg := flag.Float64("connect-rate", math.MaxFloat64, "maximum number of new connection per second")
 	workerArg := flag.Int("worker", 16, "number of workers")
 	reqsArg := flag.Int("reqs", 1024, "number of requests")
@@ -292,10 +311,26 @@ func realMain() int {
 	for _, junkSv := range strings.Split(*junkArg, ",") {
 		host, port, err := util.SplitHostPort(junkSv)
 		if err != nil {
-			log.Errorf("can not parse host:port pair %q : %v", junkSv, err)
+			log.Errorf("can not parse host:port pair %q: %v", junkSv, err)
 			return 2
 		}
 		junkServers = append(junkServers, hostPortPair{host, port})
+	}
+	if len(junkServers) == 0 {
+		log.Errorf("no junk server specified")
+		return 2
+	}
+
+	localAddrs := make([]*net.TCPAddr, 0)
+	if len(*localArg) > 0 {
+		for _, piece := range strings.Split(*localArg, ",") {
+			addr, err := util.ParseTCPAddr(piece)
+			if err != nil {
+				log.Errorf("can not parse local address %q: %v", piece, err)
+				return 2
+			}
+			localAddrs = append(localAddrs, addr)
+		}
 	}
 
 	script, err := junkchat.ParseScript(*scriptArg)
@@ -308,7 +343,7 @@ func realMain() int {
 	cmd.StartDebugServer(*debugArg)
 
 	// run benchmark
-	works := makeSessions(*reqsArg, script, junkServers, *udpArg, *sizeArg)
+	works := makeSessions(*reqsArg, script, junkServers, localAddrs, *udpArg, *sizeArg)
 	run(
 		proxyParam{*proxyArg, time.Duration(*timeoutArg) * time.Millisecond},
 		*connectRateArg,

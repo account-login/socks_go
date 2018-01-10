@@ -23,3 +23,11 @@ func SplitHostPort(hostPort string) (host string, port uint16, err error) {
 	port = uint16(portInt)
 	return
 }
+
+func ParseTCPAddr(input string) (*net.TCPAddr, error) {
+	host, port, err := SplitHostPort(input)
+	if err != nil {
+		return nil, err
+	}
+	return &net.TCPAddr{IP: net.ParseIP(host), Port: int(port)}, nil
+}
