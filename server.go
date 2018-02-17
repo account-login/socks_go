@@ -133,6 +133,7 @@ func (s *Server) cmdConnect(conn net.Conn, proto *ServerProtocol, addr SocksAddr
 
 	defer func() {
 		if targetConn != nil {
+			// TODO: reject connection on error
 			closeErr := targetConn.Close()
 			if closeErr != nil {
 				log.Errorf("close target conn err: %v", closeErr)
@@ -207,7 +208,7 @@ func (s *Server) cmdUDP(conn net.Conn, proto *ServerProtocol, addr SocksAddr, po
 	}()
 
 	// create udp socket
-	clientConn, err = net.ListenUDP("udp", nil)
+	clientConn, err = net.ListenUDP("udp", nil) // FIXME: listen on tcp addr ip
 	if err != nil {
 		err = errors.Wrapf(err, "error creating client udp socket")
 		return
