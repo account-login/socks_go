@@ -78,9 +78,6 @@ func doRead(size int, duration time.Duration, reader io.Reader) chan error {
 		err := tl.DoWork(func(n int) (done int, err error) {
 			return reader.Read(make([]byte, n))
 		})
-		if err == io.EOF {
-			err = nil
-		}
 		errch <- err
 	}()
 	return errch
