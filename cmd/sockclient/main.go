@@ -13,17 +13,6 @@ import (
 	log "github.com/cihub/seelog"
 )
 
-const MethodMyExtended = socks_go.MethodPrivateBegin + 1
-
-func extendedAuthHandler(proto *socks_go.ClientProtocol) (err error) {
-	var ip net.IP
-	ip, err = util.ReadRequired(proto.Transport, 4)
-	if err == nil {
-		log.Infof("ip echo: %v", ip)
-	}
-	return err
-}
-
 func realMain() int {
 	// logging
 	defer log.Flush()
@@ -71,13 +60,7 @@ func realMain() int {
 	}
 
 	// make socks5 client
-	client := socks_go.NewClient(
-		conn,
-		map[byte]socks_go.ClientAuthHandlerFunc{
-			socks_go.MethodNone: socks_go.ClientNoAuthHandler,
-			MethodMyExtended:    extendedAuthHandler,
-		},
-	)
+	client := socks_go.NewClient(conn, nil)
 
 	if *udpArg {
 		return doUDP(&client, host, port, doClose)
