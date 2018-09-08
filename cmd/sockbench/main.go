@@ -304,7 +304,7 @@ func realMain() int {
 	sizeArg := flag.Int("size", 1024, "send packet size in UDP")
 	scriptArg := flag.String("script", "", `scripts to run
 		In TCP mode, the unit is bytes. In UDP mode, the unit is the number of packets`)
-	debugArg := flag.String("debug", ":6060", "http debug server")
+	debugArg := flag.String("debug", "127.0.0.1:6060", "http debug server")
 	flag.Parse()
 
 	junkServers := make([]hostPortPair, 0)

@@ -33,7 +33,7 @@ func realMain() int {
 
 	// args
 	bindArg := flag.String("bind", ":1080", "bind on address")
-	debugArg := flag.String("debug", ":6061", "http debug server")
+	debugArg := flag.String("debug", "127.0.0.1:6061", "http debug server")
 	flag.Parse()
 
 	go monitor()

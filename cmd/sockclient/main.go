@@ -32,7 +32,7 @@ func realMain() int {
 	// parse args
 	proxyArg := flag.String("proxy", "127.0.0.1:1080", "socks5 proxy server")
 	udpArg := flag.Bool("udp", false, "UDP mode")
-	debugArg := flag.String("debug", ":6062", "http debug server")
+	debugArg := flag.String("debug", "127.0.0.1:6062", "http debug server")
 
 	flag.Parse()
 	target := flag.Arg(0)
