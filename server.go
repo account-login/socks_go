@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"bytes"
 
@@ -15,23 +16,29 @@ import (
 type AuthHandlerFunc func(methods []byte, proto *ServerProtocol) error
 
 type Server struct {
-	Addr        string
-	AuthHandler AuthHandlerFunc
-}
-
-func NewServer(addr string, authHandler AuthHandlerFunc) Server {
-	if authHandler == nil {
-		authHandler = noAuthHandler
-	}
-	return Server{addr, authHandler}
+	Addr           string
+	AuthHandler    AuthHandlerFunc
+	ConnectTimeout time.Duration
+	IPV4Only       bool
 }
 
 func noAuthHandler(methods []byte, proto *ServerProtocol) error {
 	return proto.AcceptAuthMethod(MethodNone)
 }
 
+func (s *Server) init() {
+	if s.AuthHandler == nil {
+		s.AuthHandler = noAuthHandler
+	}
+	if s.ConnectTimeout == 0 {
+		s.ConnectTimeout = 3 * time.Second
+	}
+}
+
 // TODO: quitable?
 func (s *Server) Run() (err error) {
+	s.init()
+
 	listener, err := net.Listen("tcp", s.Addr)
 	if err != nil {
 		return
@@ -109,9 +116,12 @@ func (s *Server) handleConnection(conn net.Conn) {
 	return
 }
 
-func makeConnection(addr SocksAddr, port uint16) (net.Conn, error) {
-	// TODO: timeout
-	return net.Dial("tcp", fmt.Sprintf("%v:%d", addr, port))
+func (s *Server) makeConnection(addr SocksAddr, port uint16) (net.Conn, error) {
+	network := "tcp"
+	if s.IPV4Only {
+		network = "tcp4"
+	}
+	return net.DialTimeout(network, fmt.Sprintf("%v:%d", addr, port), s.ConnectTimeout)
 }
 
 func parseNetAddr(netAddr net.Addr) (addr SocksAddr, port uint16, err error) {
@@ -141,7 +151,7 @@ func (s *Server) cmdConnect(conn net.Conn, proto *ServerProtocol, addr SocksAddr
 		}
 	}()
 
-	targetConn, err = makeConnection(addr, port)
+	targetConn, err = s.makeConnection(addr, port)
 	if err != nil {
 		return
 	}

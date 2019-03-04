@@ -33,13 +33,17 @@ func realMain() int {
 
 	// args
 	bindArg := flag.String("bind", ":1080", "bind on address")
+	ipv4Arg := flag.Bool("4", false, "ipv4 only")
 	debugArg := flag.String("debug", "127.0.0.1:6061", "http debug server")
 	flag.Parse()
 
 	go monitor()
 	cmd.StartDebugServer(*debugArg)
 
-	server := socks_go.NewServer(*bindArg, nil)
+	server := socks_go.Server{
+		Addr:     *bindArg,
+		IPV4Only: *ipv4Arg,
+	}
 	err := server.Run()
 	if err != nil {
 		log.Errorf("failed to start server: %v", err)
